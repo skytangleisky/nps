@@ -347,11 +347,15 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err erro
 		if v.Location == "" {
 			v.Location = "/"
 		}
-		if strings.Index(r.RequestURI, v.Location) == 0 {
+		//tanglei
+		//if strings.Index(r.RequestURI, v.Location) == 0 {//http代理访问有问题
+		//if strings.Index(r.URL.Path, v.Location) == 0 {//https代理访问有问题
+		if strings.Index(r.URL.Path, v.Location) == 0 || strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
 			if h == nil || (len(v.Location) > len(h.Location)) {
 				h = v
 			}
 		}
+
 	}
 	if h != nil {
 		return
