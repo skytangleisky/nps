@@ -26,7 +26,7 @@ func (lg *StoreMsg) Init(config string) error {
 	return nil
 }
 
-func (lg *StoreMsg) WriteMsg(when time.Time, msg string, level int) error {
+func (lg *StoreMsg) WriteMsg(when time.Time, msg string, level int) ([]byte, error) {
 	m := when.Format("2006-01-02 15:04:05") + " " + msg + "\r\n"
 	if len(logMsgs) > MaxMsgLen {
 		start := MaxMsgLen - len(m)
@@ -36,7 +36,7 @@ func (lg *StoreMsg) WriteMsg(when time.Time, msg string, level int) error {
 		logMsgs = logMsgs[start:]
 	}
 	logMsgs += m
-	return nil
+	return []byte(logMsgs), nil
 }
 
 func (lg *StoreMsg) Destroy() {

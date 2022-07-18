@@ -7,11 +7,15 @@ import (
 	"ehang.io/nps/lib/file"
 	"ehang.io/nps/lib/install"
 	"ehang.io/nps/lib/version"
+	"ehang.io/nps/web/controllers"
 	"flag"
 	"fmt"
+	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 	"github.com/ccding/go-stun/stun"
 	"github.com/kardianos/service"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -56,11 +60,12 @@ func main() {
 	if common.IsWindows() {
 		*logPath = strings.Replace(*logPath, "\\", "\\\\", -1)
 	}
-	if *debug {
-		logs.SetLogger(logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
-	} else {
-		logs.SetLogger(logs.AdapterFile, `{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
-	}
+	//if *debug {
+	//	logs.SetLogger(controllers.PrintMessage,logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
+	//} else {
+	//	logs.SetLogger(controllers.PrintMessage,logs.AdapterFile, `{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
+	//}
+	logs.SetLogger(controllers.PrintMessage, logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
 
 	// init service
 	options := make(service.KeyValue)
@@ -242,5 +247,15 @@ func run() {
 			*configPath = common.GetConfigPath()
 		}
 		go client.StartFromFile(*configPath)
+	}
+	beego.Router("/debug", &controllers.DebugController{}, "*:Debug")
+	if l, error := net.ListenTCP("tcp4", &net.TCPAddr{net.ParseIP("0.0.0.0"), 7778, ""}); error == nil {
+		beego.InitBeforeHTTPRun()
+		er := http.Serve(l, beego.BeeApp.Handlers)
+		if er != nil {
+			logs.Error(er)
+		}
+	} else {
+		logs.Error(error)
 	}
 }

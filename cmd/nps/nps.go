@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ehang.io/nps/web/controllers"
 	"flag"
 	"log"
 	"os"
@@ -39,6 +40,7 @@ func main() {
 		common.PrintVersion()
 		return
 	}
+	log.Print(common.GetRunPath())
 	if err := beego.LoadAppConfig("ini", filepath.Join(common.GetRunPath(), "conf", "nps.conf")); err != nil {
 		log.Fatalln("load config file error", err.Error())
 	}
@@ -65,11 +67,20 @@ func main() {
 		Option:      options,
 	}
 	svcConfig.Arguments = append(svcConfig.Arguments, "service")
-	if len(os.Args) > 1 && os.Args[1] == "service" {
-		_ = logs.SetLogger(logs.AdapterFile, `{"level":`+level+`,"filename":"`+logPath+`","daily":false,"maxlines":100000,"color":true}`)
-	} else {
-		_ = logs.SetLogger(logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
-	}
+	//if len(os.Args) > 1 && os.Args[1] == "service" {
+	//	//_ = logs.SetLogger(controllers.PrintMessage,logs.AdapterFile, `{"level":`+level+`,"filename":"`+logPath+`","daily":false,"maxlines":100000,"color":true}`)
+	//} else {
+	//	//_ = logs.SetLogger(controllers.PrintMessage,logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
+	//}
+	_ = logs.SetLogger(controllers.PrintMessage, logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
+	logs.Emergency("M")
+	logs.Alert("A")
+	logs.Critical("C")
+	logs.Error("E")
+	logs.Warn("W")
+	logs.Notice("N")
+	logs.Info("I")
+	logs.Debug("D")
 	if !common.IsWindows() {
 		svcConfig.Dependencies = []string{
 			"Requires=network.target",
