@@ -120,7 +120,7 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		target     net.Conn
 		err        error
 		connClient io.ReadWriteCloser
-		scheme     = r.URL.Scheme
+		//scheme     = r.URL.Scheme
 		lk         *conn.Link
 		targetAddr string
 		lenConn    *conn.LenConn
@@ -135,7 +135,7 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		}
 		c.Close()
 	}()
-reset:
+	//reset:
 	if isReset {
 		host.Client.AddConn()
 	}
@@ -199,56 +199,78 @@ reset:
 					host.Flow.Add(0, int64(lenConn.Len))
 				}
 			}
+			len, err := common.CopyBuffer(c, target)
+			if err != nil {
+				c.Close()
+				return
+			} else {
+				host.Flow.Add(0, int64(len))
+				logs.Error("----------", len)
+			}
 		}
 	}()
 
-	for {
-		//if the cache start and the request is in the cache list, return the cache
-		if s.useCache {
-			if v, ok := s.cache.Get(filepath.Join(host.Host, r.URL.Path)); ok {
-				n, err := c.Write(v.([]byte))
-				if err != nil {
-					break
-				}
-				logs.Trace("%s request, method %s, host %s, url %s, remote address %s, return cache", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String())
-				host.Flow.Add(0, int64(n))
-				//if return cache and does not create a new conn with client and Connection is not set or close, close the connection.
-				if strings.ToLower(r.Header.Get("Connection")) == "close" || strings.ToLower(r.Header.Get("Connection")) == "" {
-					break
-				}
-				goto readReq
-			}
-		}
+	//change the host and header and set proxy setting
+	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
+	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
+	//write
+	lenConn = conn.NewLenConn(connClient)
 
-		//change the host and header and set proxy setting
-		common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
-		logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
-		//write
-		lenConn = conn.NewLenConn(connClient)
-		if err := r.Write(lenConn); err != nil {
-			logs.Error(err)
-			break
-		}
-		host.Flow.Add(int64(lenConn.Len), 0)
-
-	readReq:
-		//read req from connection
-		if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
-			break
-		}
-		r.URL.Scheme = scheme
-		//What happened ，Why one character less???
-		r.Method = resetReqMethod(r.Method)
-		if hostTmp, err := file.GetDb().GetInfoByHost(r.Host, r); err != nil {
-			logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
-			break
-		} else if host != hostTmp {
-			host = hostTmp
-			isReset = true
-			connClient.Close()
-			goto reset
-		}
+	if err := r.Write(lenConn); err != nil {
+		logs.Error(err)
 	}
+	_, err = common.CopyBuffer(target, c)
+	if err != nil {
+		logs.Error(err)
+	}
+
+	//for {
+	//	//if the cache start and the request is in the cache list, return the cache
+	//	if s.useCache {
+	//		if v, ok := s.cache.Get(filepath.Join(host.Host, r.URL.Path)); ok {
+	//			n, err := c.Write(v.([]byte))
+	//			if err != nil {
+	//				break
+	//			}
+	//			logs.Trace("%s request, method %s, host %s, url %s, remote address %s, return cache", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String())
+	//			host.Flow.Add(0, int64(n))
+	//			//if return cache and does not create a new conn with client and Connection is not set or close, close the connection.
+	//			if strings.ToLower(r.Header.Get("Connection")) == "close" || strings.ToLower(r.Header.Get("Connection")) == "" {
+	//				break
+	//			}
+	//			goto readReq
+	//		}
+	//	}
+	//
+	//	//change the host and header and set proxy setting
+	//	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
+	//	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
+	//	//write
+	//	lenConn = conn.NewLenConn(connClient)
+	//	if err := r.Write(lenConn); err != nil {
+	//		logs.Error(err)
+	//		break
+	//	}
+	//	host.Flow.Add(int64(lenConn.Len), 0)
+	//
+	//readReq:
+	//	//read req from connection
+	//	if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
+	//		break
+	//	}
+	//	r.URL.Scheme = scheme
+	//	//What happened ，Why one character less???
+	//	r.Method = resetReqMethod(r.Method)
+	//	if hostTmp, err := file.GetDb().GetInfoByHost(r.Host, r); err != nil {
+	//		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
+	//		break
+	//	} else if host != hostTmp {
+	//		host = hostTmp
+	//		isReset = true
+	//		connClient.Close()
+	//		goto reset
+	//	}
+	//}
 	wg.Wait()
 }
 

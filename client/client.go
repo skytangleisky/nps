@@ -191,16 +191,17 @@ func (s *TRPClient) handleChan(src net.Conn) {
 				srcConn.Close()
 				targetConn.Close()
 			}()
-			for {
-				if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
-					srcConn.Close()
-					targetConn.Close()
-					break
-				} else {
-					logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
-					r.Write(targetConn)
-				}
+			if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
+				srcConn.Close()
+				targetConn.Close()
+				return
+			} else {
+				logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
+				r.Write(targetConn)
 			}
+			common.CopyBuffer(targetConn, srcConn)
+			srcConn.Close()
+			targetConn.Close()
 		}
 		return
 	}

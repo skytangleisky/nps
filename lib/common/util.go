@@ -100,7 +100,34 @@ func Getverifyval(vkey string) string {
 }
 
 //Change headers and host of request
+//func ChangeHostAndHeader(r *http.Request, host string, header string, addr string, addOrigin bool) {
+//	if host != "" {
+//		r.Host = host
+//	}
+//	if header != "" {
+//		h := strings.Split(header, "\n")
+//		for _, v := range h {
+//			hd := strings.Split(v, ":")
+//			if len(hd) == 2 {
+//				r.Header.Set(hd[0], hd[1])
+//			}
+//		}
+//	}
+//	addr = strings.Split(addr, ":")[0]
+//	if prior, ok := r.Header["X-Forwarded-For"]; ok {
+//		addr = strings.Join(prior, ", ") + ", " + addr
+//	}
+//	if addOrigin {
+//		r.Header.Set("X-Forwarded-For", addr)
+//		r.Header.Set("X-Real-IP", addr)
+//	}
+//}
+
+//Change headers and host of request
 func ChangeHostAndHeader(r *http.Request, host string, header string, addr string, addOrigin bool) {
+	if r.Header.Get("User-Agent") == "" {
+		r.Header.Set("User-Agent", "Lollipop/1.1") //Go-http-client/1.1(默认会添加这个代理，我们将其修改成Lollipop/1.1)
+	}
 	if host != "" {
 		r.Host = host
 	}
@@ -113,7 +140,8 @@ func ChangeHostAndHeader(r *http.Request, host string, header string, addr strin
 			}
 		}
 	}
-	addr = strings.Split(addr, ":")[0]
+	//addr = strings.Split(addr, ":")[0]
+	addr = "/" + addr
 	if prior, ok := r.Header["X-Forwarded-For"]; ok {
 		addr = strings.Join(prior, ", ") + ", " + addr
 	}
