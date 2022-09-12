@@ -3,7 +3,7 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"ehang.io/nps-mux"
+	"ehang.io/nps/nps-mux"
 	"net"
 	"net/http"
 	"strconv"

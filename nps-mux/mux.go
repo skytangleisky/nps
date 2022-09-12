@@ -1,7 +1,9 @@
 package nps_mux
 
+//ehang.io/nps-mux v0.0.0-20210407130203-4afa0c10c992
 import (
 	"errors"
+	"github.com/astaxie/beego/logs"
 	"io"
 	"log"
 	"math"
@@ -81,7 +83,7 @@ func NewMux(c net.Conn, connType string, pingCheckThreshold int) *Mux {
 	//read session by flag
 	m.readSession()
 	//ping
-	m.ping()
+	//m.ping()//tanglei
 	m.writeSession()
 	return m
 }
@@ -180,7 +182,7 @@ func (s *Mux) ping() {
 			case <-ticker.C:
 			}
 			if atomic.LoadUint32(&s.pingCheckTime) > s.pingCheckThreshold {
-				log.Println("mux: ping time out, checktime", s.pingCheckTime, "threshold", s.pingCheckThreshold)
+				logs.Error("mux: ping time out, checktime", s.pingCheckTime, "threshold", s.pingCheckThreshold)
 				_ = s.Close()
 				// more than limit times not receive the ping return package,
 				// mux conn is damaged, maybe a packet drop, close it
@@ -247,7 +249,7 @@ func (s *Mux) readSession() {
 			pack = muxPack.Get()
 			s.bw.StartRead()
 			if l, err = pack.UnPack(s.conn); err != nil {
-				log.Println("mux: read session unpack from connection err", err)
+				logs.Error("mux: read session unpack from connection err", err)
 				_ = s.Close()
 				break
 			}
@@ -326,7 +328,7 @@ func (s *Mux) Close() (err error) {
 		return errors.New("the mux has closed")
 	}
 	s.IsClose = true
-	log.Println("close mux")
+	logs.Error("close mux")
 	s.connMap.Close()
 	//s.connMap = nil
 	s.closeChan <- struct{}{}

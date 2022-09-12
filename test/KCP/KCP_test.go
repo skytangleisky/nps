@@ -1,9 +1,10 @@
 package KCP
 
 import (
-	nps_mux "ehang.io/nps-mux"
 	"ehang.io/nps/lib/common"
+	"ehang.io/nps/nps-mux"
 	"github.com/astaxie/beego/logs"
+	"github.com/xtaci/kcp-go"
 	"github.com/xtaci/kcp-go/v5"
 	"log"
 	"math/rand"
