@@ -99,18 +99,22 @@ func StartFromFile(path string) {
 re:
 	if first || cnf.CommonConfig.AutoReconnection {
 		if !first {
-			logs.Info("Reconnecting...")
 			time.Sleep(time.Second * 5)
+			logs.Info("Reconnecting...")
 		}
 	} else {
 		return
 	}
 	first = false
 	c, err := NewConn(cnf.CommonConfig.Tp, cnf.CommonConfig.VKey, cnf.CommonConfig.Server, common.WORK_CONFIG, cnf.CommonConfig.ProxyUrl)
-	if err != nil {
+	if err != nil || c == nil {
+		if c != nil {
+			c.Close()
+		}
 		logs.Error(err)
 		goto re
 	}
+	logs.Info("%s connected", c.LocalAddr())
 	var isPub bool
 	binary.Read(c, binary.LittleEndian, &isPub)
 
@@ -170,14 +174,18 @@ re:
 	}
 
 	c.Close()
+	logs.Warn("%s disconnected", c.LocalAddr())
 	if cnf.CommonConfig.Client.WebUserName == "" || cnf.CommonConfig.Client.WebPassword == "" {
 		logs.Notice("web access login username:user password:%s", vkey)
 	} else {
 		logs.Notice("web access login username:%s password:%s", cnf.CommonConfig.Client.WebUserName, cnf.CommonConfig.Client.WebPassword)
 	}
-	NewRPClient(cnf.CommonConfig.Server, vkey, cnf.CommonConfig.Tp, cnf.CommonConfig.ProxyUrl, cnf, cnf.CommonConfig.DisconnectTime).Start()
+	cl := NewRPClient(cnf.CommonConfig.Server, vkey, cnf.CommonConfig.Tp, cnf.CommonConfig.ProxyUrl, cnf, cnf.CommonConfig.DisconnectTime)
+	cl.Start()
 	CloseLocalServer()
-	goto re
+	if !cl.logout {
+		goto re
+	}
 }
 
 // Create a new connection with the server and verify it
@@ -218,17 +226,21 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 	defer connection.SetDeadline(time.Time{})
 	c := conn.NewConn(connection)
 	if _, err := c.Write([]byte(common.CONN_TEST)); err != nil {
+		c.Close()
 		return nil, err
 	}
 	if err := c.WriteLenContent([]byte(version.GetVersion())); err != nil {
+		c.Close()
 		return nil, err
 	}
 	if err := c.WriteLenContent([]byte(version.VERSION)); err != nil {
+		c.Close()
 		return nil, err
 	}
 	b, err := c.GetShortContent(32)
 	if err != nil {
 		logs.Error(err)
+		c.Close()
 		return nil, err
 	}
 	if crypt.Md5(version.GetVersion()) != string(b) {
@@ -236,14 +248,19 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 		return nil, err
 	}
 	if _, err := c.Write([]byte(common.Getverifyval(vkey))); err != nil {
+		c.Close()
 		return nil, err
 	}
 	if s, err := c.ReadFlag(); err != nil {
 		return nil, err
 	} else if s == common.VERIFY_EER {
-		return nil, errors.New(fmt.Sprintf("Validation key %s incorrect", vkey))
+		e := errors.New(fmt.Sprintf("Validation key %s incorrect", vkey))
+		logs.Error(e)
+		os.Exit(0) //tanglei
+		return nil, e
 	}
 	if _, err := c.Write([]byte(connType)); err != nil {
+		c.Close()
 		return nil, err
 	}
 	c.SetAlive(tp)
@@ -251,7 +268,7 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 	return c, nil
 }
 
-//http proxy connection
+// http proxy connection
 func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	req, err := http.NewRequest("CONNECT", "http://"+remoteAddr, nil)
 	if err != nil {
@@ -278,7 +295,7 @@ func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	return proxyConn, nil
 }
 
-//get a basic auth string
+// get a basic auth string
 func basicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
@@ -294,6 +311,7 @@ func getRemoteAddressFromServer(rAddr string, localConn *net.UDPConn, md5Passwor
 	if err != nil {
 		return err
 	}
+	logs.Warn(addr)
 	if _, err := localConn.WriteTo(common.GetWriteStr(md5Password, role), addr); err != nil {
 		return err
 	}
@@ -343,6 +361,55 @@ func handleP2PUdp(localAddr, rAddr, md5Password, role string) (remoteAddress str
 		}
 	}
 	if remoteAddress, err = sendP2PTestMsg(localConn, remoteAddr1, remoteAddr2, remoteAddr3); err != nil {
+		return
+	}
+	c, err = newUdpConnByAddr(localAddr)
+	return
+}
+
+func handleP2PUdp2(localAddr, rAddr, md5Password, role string) (remoteAddress string, c net.PacketConn, err error) {
+	localConn, err := newUdpConnByAddr(localAddr)
+	if err != nil {
+		return
+	}
+	err = getRemoteAddressFromServer(rAddr, localConn, md5Password, role, 0)
+	if err != nil {
+		logs.Error(err)
+		return
+	}
+	err = getRemoteAddressFromServer(rAddr, localConn, md5Password, role, 1)
+	if err != nil {
+		logs.Error(err)
+		return
+	}
+	err = getRemoteAddressFromServer(rAddr, localConn, md5Password, role, 2)
+	if err != nil {
+		logs.Error(err)
+		return
+	}
+	var remoteAddr, remoteAddr1, remoteAddr2 string
+	for {
+		buf := make([]byte, 1024)
+		if n, addr, er := localConn.ReadFromUDP(buf); er != nil {
+			err = er
+			return
+		} else {
+			rAddr1, _ := getNextAddr(rAddr, 1)
+			rAddr2, _ := getNextAddr(rAddr, 2)
+			switch addr.String() {
+			case rAddr:
+				remoteAddr = string(buf[:n])
+			case rAddr1:
+				remoteAddr1 = string(buf[:n])
+			case rAddr2:
+				remoteAddr2 = string(buf[:n])
+			}
+		}
+		if remoteAddr != "" && remoteAddr1 != "" && remoteAddr2 != "" {
+			break
+		}
+	}
+	if remoteAddress, err = sendP2PTestMsg(localConn, remoteAddr, remoteAddr1, remoteAddr2); err != nil {
 		return
 	}
 	c, err = newUdpConnByAddr(localAddr)
@@ -431,6 +498,7 @@ func sendP2PTestMsg(localConn *net.UDPConn, remoteAddr1, remoteAddr2, remoteAddr
 			}
 			return addr.String(), nil
 		case common.WORK_P2P_END:
+			logs.Warn(common.WORK_P2P_END)
 			logs.Trace("Remotely Address %s Reply Packet Successfully Received", addr.String())
 			return addr.String(), nil
 		case common.WORK_P2P_CONNECT:

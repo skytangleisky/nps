@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"io"
 	"net"
 	"strings"
 	"sync"
@@ -27,7 +26,7 @@ func NewUdpModeServer(bridge *bridge.Bridge, task *file.Tunnel) *UdpModeServer {
 	return s
 }
 
-//开始
+// 开始
 func (s *UdpModeServer) Start() error {
 	var err error
 	if s.task.ServerIp == "" {
@@ -54,7 +53,7 @@ func (s *UdpModeServer) Start() error {
 
 func (s *UdpModeServer) process(addr *net.UDPAddr, data []byte) {
 	if v, ok := s.addrMap.Load(addr.String()); ok {
-		clientConn, ok := v.(io.ReadWriteCloser)
+		clientConn, ok := v.(net.Conn)
 		if ok {
 			clientConn.Write(data)
 			s.task.Flow.Add(int64(len(data)), 0)

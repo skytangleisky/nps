@@ -83,7 +83,7 @@ func NewMux(c net.Conn, connType string, pingCheckThreshold int) *Mux {
 	//read session by flag
 	m.readSession()
 	//ping
-	//m.ping()//tanglei
+	m.ping() //tanglei
 	m.writeSession()
 	return m
 }
@@ -168,6 +168,8 @@ func (s *Mux) writeSession() {
 }
 
 func (s *Mux) ping() {
+	//time.Now().Format("2006-01-02 15:04:05")
+	//strconv.FormatInt(time.Now().UnixNano()/1e6, 10)
 	go func() {
 		now, _ := time.Now().UTC().MarshalText()
 		s.sendInfo(muxPingFlag, muxPing, now)
@@ -181,13 +183,13 @@ func (s *Mux) ping() {
 			select {
 			case <-ticker.C:
 			}
-			if atomic.LoadUint32(&s.pingCheckTime) > s.pingCheckThreshold {
-				logs.Error("mux: ping time out, checktime", s.pingCheckTime, "threshold", s.pingCheckThreshold)
-				_ = s.Close()
-				// more than limit times not receive the ping return package,
-				// mux conn is damaged, maybe a packet drop, close it
-				break
-			}
+			//if atomic.LoadUint32(&s.pingCheckTime) > s.pingCheckThreshold {
+			//	logs.Error("mux: ping time out, checktime", s.pingCheckTime, "threshold", s.pingCheckThreshold)
+			//	_ = s.Close()
+			//	// more than limit times not receive the ping return package,
+			//	// mux conn is damaged, maybe a packet drop, close it
+			//	break
+			//}
 			now, _ = time.Now().UTC().MarshalText()
 			s.sendInfo(muxPingFlag, muxPing, now)
 			atomic.AddUint32(&s.pingCheckTime, 1)
@@ -204,6 +206,8 @@ func (s *Mux) ping() {
 			}
 			select {
 			case data = <-s.pingCh:
+				_ = now.UnmarshalText(data)
+				//logs.Alert(now.UTC().Format("2006-01-02 15:04:05"))
 				atomic.StoreUint32(&s.pingCheckTime, 0)
 			case <-s.closeChan:
 				break
@@ -363,7 +367,7 @@ func (s *Mux) release() {
 	s.newConnQueue.Stop()
 }
 
-//Get New connId as unique flag
+// Get New connId as unique flag
 func (s *Mux) getId() (id int32) {
 	//Avoid going beyond the scope
 	if (math.MaxInt32 - s.id) < 10000 {

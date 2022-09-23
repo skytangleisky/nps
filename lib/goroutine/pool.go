@@ -5,19 +5,18 @@ import (
 	"ehang.io/nps/lib/file"
 	"github.com/astaxie/beego/logs"
 	"github.com/panjf2000/ants/v2"
-	"io"
 	"net"
 	"sync"
 )
 
 type connGroup struct {
-	src io.ReadWriteCloser
-	dst io.ReadWriteCloser
+	src net.Conn
+	dst net.Conn
 	wg  *sync.WaitGroup
 	n   *int64
 }
 
-func newConnGroup(dst, src io.ReadWriteCloser, wg *sync.WaitGroup, n *int64) connGroup {
+func newConnGroup(dst, src net.Conn, wg *sync.WaitGroup, n *int64) connGroup {
 	return connGroup{
 		src: src,
 		dst: dst,
@@ -42,13 +41,13 @@ func copyConnGroup(group interface{}) {
 }
 
 type Conns struct {
-	conn1 io.ReadWriteCloser // mux connection
-	conn2 net.Conn           // outside connection
+	conn1 net.Conn // mux connection
+	conn2 net.Conn // outside connection
 	flow  *file.Flow
 	wg    *sync.WaitGroup
 }
 
-func NewConns(c1 io.ReadWriteCloser, c2 net.Conn, flow *file.Flow, wg *sync.WaitGroup) Conns {
+func NewConns(c1 net.Conn, c2 net.Conn, flow *file.Flow, wg *sync.WaitGroup) Conns {
 	return Conns{
 		conn1: c1,
 		conn2: c2,
@@ -67,7 +66,7 @@ func copyConns(group interface{}) {
 	_ = connCopyPool.Invoke(newConnGroup(conns.conn2, conns.conn1, wg, &out))
 	// mux to outside : outgoing
 	wg.Wait()
-	logs.Warn(common.Changeunit(in), common.Changeunit(out))
+	logs.Warn(common.Changeunit(in), common.Changeunit(out), conns.conn1.LocalAddr(), conns.conn1.RemoteAddr(), conns.conn2.LocalAddr(), conns.conn2.RemoteAddr())
 	if conns.flow != nil {
 		conns.flow.Add(in, out)
 	}

@@ -1,11 +1,10 @@
 package client
 
 import (
-	"bufio"
 	"bytes"
 	"ehang.io/nps/nps-mux"
 	"net"
-	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -31,9 +30,10 @@ type TRPClient struct {
 	cnf            *config.Config
 	disconnectTime int
 	once           sync.Once
+	logout         bool
 }
 
-//new client
+// new client
 func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl string, cnf *config.Config, disconnectTime int) *TRPClient {
 	return &TRPClient{
 		svrAddr:        svraddr,
@@ -44,17 +44,17 @@ func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl st
 		cnf:            cnf,
 		disconnectTime: disconnectTime,
 		once:           sync.Once{},
+		logout:         false,
 	}
 }
 
 var NowStatus int
-var CloseClient bool
 
-//start
+// start
 func (s *TRPClient) Start() {
-	CloseClient = false
+	s.logout = false
 retry:
-	if CloseClient {
+	if s.logout {
 		return
 	}
 	NowStatus = 0
@@ -69,29 +69,30 @@ retry:
 		time.Sleep(time.Second * 5)
 		goto retry
 	}
-	logs.Info("Successful connection with server %s", s.svrAddr)
+	logs.Info("%s -> %s", c.LocalAddr(), s.svrAddr)
 	//monitor the connection
-	go s.ping()
+	go s.ping2()
 	s.signal = c
 	//start a channel connection
-	go s.newChan()
-	//start health check if the it's open
+	go s.newChan() //tanglei
+	//start health check if it's open
 	if s.cnf != nil && len(s.cnf.Healths) > 0 {
-		go heathCheck(s.cnf.Healths, s.signal)
+		go healthCheck(s.cnf.Healths, s.signal)
 	}
 	NowStatus = 1
 	//msg connection, eg udp
 	s.handleMain()
 }
 
-//handle main connection
+// handle main connection
 func (s *TRPClient) handleMain() {
 	for {
 		flags, err := s.signal.ReadFlag()
 		if err != nil {
-			logs.Error("Accept server data error %s, end this service", err.Error())
+			logs.Error("Accept server data error %s, end this service,%s", err.Error(), s.signal.LocalAddr())
 			break
 		}
+		logs.Warn("flag", "=>", flags)
 		switch flags {
 		case common.NEW_UDP_CONN:
 			//read server udp addr and password
@@ -113,16 +114,109 @@ func (s *TRPClient) handleMain() {
 				}
 				go s.newUdpConn(localAddr, string(lAddr), string(pwd))
 			}
+		case common.RES_CLOSE:
+			s.logout = true
+			os.Exit(0)
+			goto exit
 		}
 	}
+exit:
 	s.Close()
 }
+
+//func logout(s *TRPClient)  {
+//	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, "software\\lollipop", registry.ALL_ACCESS)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer key.Close()
+//
+//	//subKey, _, err := registry.CreateKey(key, "test", registry.ALL_ACCESS)
+//	//if err != nil {
+//	//	log.Fatal(err)
+//	//}
+//	//defer subKey.Close()
+//
+//	key1, err := registry.OpenKey(registry.LOCAL_MACHINE, "software\\lollipop", registry.ALL_ACCESS)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer key1.Close()
+//
+//	//err = key.SetStringValue("K", "V")
+//	//if err != nil {
+//	//	log.Fatal(err)
+//	//}
+//
+//	v, _, err := key.GetStringValue("config")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	//fmt.Println(v, vt)
+//
+//	data:=make([]map[string]interface{},0)
+//	e := json.Unmarshal([]byte(v), &data)
+//	if e != nil {
+//		panic(e)
+//	}
+//	for _,person :=range data{
+//		if person["unionid"] == s.vKey{
+//			person["isLogined"]=false
+//		}
+//	}
+//
+//
+//	out,er:=json.MarshalIndent(data,"","\t")
+//	if er != nil{
+//		panic(er)
+//	}
+//	fmt.Print(string(out))
+//
+//	err = key.SetStringValue("config", string(out))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	/*
+//		kns, err := key.ReadSubKeyNames(0)
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//		fmt.Println(kns)
+//	*/
+//	/*
+//		vns, err := key.ReadValueNames(0)
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//		fmt.Println(vns)
+//	*/
+//	/*
+//		err = key.DeleteValue("A")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//	*/
+//
+//	/*
+//		err = registry.DeleteKey(registry.LOCAL_MACHINE, "test")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//	*/
+//	/*
+//		err = registry.DeleteKey(key, "test_sub")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//	*/
+//}
 
 func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 	var localConn net.PacketConn
 	var err error
 	var remoteAddress string
-	if remoteAddress, localConn, err = handleP2PUdp(localAddr, rAddr, md5Password, common.WORK_P2P_PROVIDER); err != nil {
+	if remoteAddress, localConn, err = handleP2PUdp2(localAddr, rAddr, md5Password, common.WORK_P2P_PROVIDER); err != nil {
 		logs.Error(err)
 		return
 	}
@@ -151,18 +245,19 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 	}
 }
 
-//pmux tunnel
+// pmux tunnel
 func (s *TRPClient) newChan() {
 	tunnel, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, common.WORK_CHAN, s.proxyUrl)
 	if err != nil {
-		logs.Error("connect to ", s.svrAddr, "error:", err)
+		logs.Error("connect to ", s.svrAddr, "error:", err.Error())
 		return
 	}
+	logs.Info("%s -> %s", tunnel.LocalAddr(), s.svrAddr)
 	s.tunnel = nps_mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime)
 	for {
 		src, err := s.tunnel.Accept()
 		if err != nil {
-			logs.Warn(err)
+			logs.Error(err.Error(), tunnel.Conn.LocalAddr())
 			s.Close()
 			break
 		}
@@ -185,7 +280,9 @@ func (s *TRPClient) handleChan(src net.Conn) {
 			logs.Warn("connect to %s error %s", lk.Host, err.Error())
 			src.Close()
 		} else {
-			srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
+			logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
+			conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, nil)
+			/*srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
 			go func() {
 				common.CopyBuffer(srcConn, targetConn)
 				srcConn.Close()
@@ -201,7 +298,7 @@ func (s *TRPClient) handleChan(src net.Conn) {
 			}
 			common.CopyBuffer(targetConn, srcConn)
 			srcConn.Close()
-			targetConn.Close()
+			targetConn.Close()*/
 		}
 		return
 	}
@@ -292,13 +389,29 @@ loop:
 		}
 	}
 }
-
+func (s *TRPClient) ping2() {
+	s.ticker = time.NewTicker(time.Second * 5)
+loop:
+	for {
+		select {
+		case <-s.ticker.C:
+			var buffer bytes.Buffer
+			buffer.WriteString("1234")
+			s.signal.Write(buffer.Bytes()) //对一次连接中 三个TCP连接 的第二个连接 保活 (和bridge.go中的ping()方法是否有关？)
+			//logs.Info(buffer.String())
+			if s.tunnel != nil && s.tunnel.IsClose {
+				s.Close()
+				break loop
+			}
+		}
+	}
+}
 func (s *TRPClient) Close() {
 	s.once.Do(s.closing)
 }
 
 func (s *TRPClient) closing() {
-	CloseClient = true
+	//s.logout = true
 	NowStatus = 0
 	if s.tunnel != nil {
 		_ = s.tunnel.Close()

@@ -1,23 +1,25 @@
 package rate
 
 import (
-	"io"
+	"net"
 )
 
 type rateConn struct {
-	conn io.ReadWriteCloser
+	net.Conn
 	rate *Rate
 }
 
-func NewRateConn(conn io.ReadWriteCloser, rate *Rate) io.ReadWriteCloser {
-	return &rateConn{
-		conn: conn,
+func NewRateConn(conn net.Conn, rate *Rate) *rateConn {
+	tmp := &rateConn{
+		Conn: conn,
 		rate: rate,
 	}
+
+	return tmp
 }
 
 func (s *rateConn) Read(b []byte) (n int, err error) {
-	n, err = s.conn.Read(b)
+	n, err = s.Conn.Read(b)
 	if s.rate != nil {
 		s.rate.Get(int64(n))
 	}
@@ -25,7 +27,7 @@ func (s *rateConn) Read(b []byte) (n int, err error) {
 }
 
 func (s *rateConn) Write(b []byte) (n int, err error) {
-	n, err = s.conn.Write(b)
+	n, err = s.Conn.Write(b)
 	if s.rate != nil {
 		s.rate.Get(int64(n))
 	}
@@ -33,5 +35,5 @@ func (s *rateConn) Write(b []byte) (n int, err error) {
 }
 
 func (s *rateConn) Close() error {
-	return s.conn.Close()
+	return s.Conn.Close()
 }

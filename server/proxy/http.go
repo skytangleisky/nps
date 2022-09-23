@@ -6,11 +6,9 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"ehang.io/nps/bridge"
@@ -60,19 +58,21 @@ func (s *httpServer) Start() error {
 		s.errorContent = []byte("nps 404")
 	}
 	if s.httpPort > 0 {
-		s.httpServer = s.NewServer(s.httpPort, "http")
-		go func() {
-			l, err := connection.GetHttpListener()
-			if err != nil {
-				logs.Error(err)
-				os.Exit(0)
-			}
-			err = s.httpServer.Serve(l)
-			if err != nil {
-				logs.Error(err)
-				os.Exit(0)
-			}
-		}()
+		//s.httpServer = s.NewServer(s.httpPort, "http")
+		//go func() {
+		//	l, err := connection.GetHttpListener()
+		//	if err != nil {
+		//		logs.Error(err)
+		//		os.Exit(0)
+		//	}
+		//	err = s.httpServer.Serve(l)
+		//	if err != nil {
+		//		logs.Error(err)
+		//		os.Exit(0)
+		//	}
+		//}()
+		s.NewServerTCP(s.httpPort, "http")
+
 	}
 	if s.httpsPort > 0 {
 		s.httpsServer = s.NewServer(s.httpsPort, "https")
@@ -177,34 +177,36 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 			}
 		}()
 		for {
-			if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
-				// if there got broken pipe, http.ReadResponse will get a nil
-				return
-			} else {
-				//if the cache is start and the response is in the extension,store the response to the cache list
-				if s.useCache && r.URL != nil && strings.Contains(r.URL.Path, ".") {
-					b, err := httputil.DumpResponse(resp, true)
-					if err != nil {
-						return
-					}
-					c.Write(b)
-					host.Flow.Add(0, int64(len(b)))
-					s.cache.Add(filepath.Join(host.Host, r.URL.Path), b)
+			/*
+				if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
+					// if there got broken pipe, http.ReadResponse will get a nil
+					return
 				} else {
-					lenConn := conn.NewLenConn(c)
-					if err := resp.Write(lenConn); err != nil {
-						logs.Error(err)
-						return
+					//if the cache is start and the response is in the extension,store the response to the cache list
+					if s.useCache && r.URL != nil && strings.Contains(r.URL.Path, ".") {
+						b, err := httputil.DumpResponse(resp, true)
+						if err != nil {
+							return
+						}
+						c.Write(b)
+						host.Flow.Add(0, int64(len(b)))
+						s.cache.Add(filepath.Join(host.Host, r.URL.Path), b)
+					} else {
+						lenConn := conn.NewLenConn(c)
+						if err := resp.Write(lenConn); err != nil {
+							logs.Error(err)
+							return
+						}
+						host.Flow.Add(0, int64(lenConn.Len))
 					}
-					host.Flow.Add(0, int64(lenConn.Len))
-				}
-			}
-			len, err := common.CopyBuffer(c, target)
+				}*/
+
+			len, err := common.CopyBuffer(c, connClient)
 			if err != nil {
 				c.Close()
 				return
 			} else {
-				host.Flow.Add(0, int64(len))
+				host.Flow.Add(len, 0)
 				logs.Error("----------", len)
 			}
 		}
@@ -219,9 +221,11 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 	if err := r.Write(lenConn); err != nil {
 		logs.Error(err)
 	}
-	_, err = common.CopyBuffer(target, c)
+	_, err = common.CopyBuffer(connClient, c)
 	if err != nil {
-		logs.Error(err)
+		c.Close()
+		connClient.Close()
+		return
 	}
 
 	//for {
@@ -254,6 +258,13 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 	//	host.Flow.Add(int64(lenConn.Len), 0)
 	//
 	//readReq:
+	//
+	//	_,err=common.CopyBuffer(target,c)
+	//	if err!=nil{
+	//		target.Close()
+	//		break
+	//	}
+	//
 	//	//read req from connection
 	//	if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
 	//		break
@@ -270,6 +281,7 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 	//		connClient.Close()
 	//		goto reset
 	//	}
+	//
 	//}
 	wg.Wait()
 }
@@ -293,5 +305,38 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 		}),
 		// Disable HTTP/2.
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+}
+func (s *httpServer) NewServerTCP(port int, scheme string) {
+
+	tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(port))
+	tcpListener, err := net.ListenTCP("tcp4", tcpAddr)
+	if err != nil {
+		logs.Error(err)
+	} else {
+		go func() {
+			for {
+				tcpConn, err := tcpListener.AcceptTCP()
+				if err != nil {
+					logs.Error(err)
+					tcpConn.Close()
+				} else {
+					go func() {
+						s.Process(tcpConn)
+					}()
+				}
+
+			}
+		}()
+	}
+}
+
+func (s *httpServer) Process(tcpConn *net.TCPConn) {
+	if r, err := http.ReadRequest(bufio.NewReader(tcpConn)); err != nil || r == nil {
+		// if there got broken pipe, http.ReadResponse will get a nil
+		return
+	} else {
+		r.URL.Scheme = "http"
+		s.handleHttp(conn.NewConn(tcpConn), r)
 	}
 }

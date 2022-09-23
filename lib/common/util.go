@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +22,7 @@ import (
 	"ehang.io/nps/lib/crypt"
 )
 
-//Get the corresponding IP address through domain name
+// Get the corresponding IP address through domain name
 func GetHostByName(hostname string) string {
 	if !DomainCheck(hostname) {
 		return hostname
@@ -37,7 +38,7 @@ func GetHostByName(hostname string) string {
 	return ""
 }
 
-//Check the legality of domain
+// Check the legality of domain
 func DomainCheck(domain string) bool {
 	var match bool
 	IsLine := "^((http://)|(https://))?([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,6}(/)"
@@ -49,7 +50,7 @@ func DomainCheck(domain string) bool {
 	return match
 }
 
-//Check if the Request request is validated
+// Check if the Request request is validated
 func CheckAuth(r *http.Request, user, passwd string) bool {
 	s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
 	if len(s) != 2 {
@@ -71,7 +72,7 @@ func CheckAuth(r *http.Request, user, passwd string) bool {
 	return pair[0] == user && pair[1] == passwd
 }
 
-//get bool by str
+// get bool by str
 func GetBoolByStr(s string) bool {
 	switch s {
 	case "1", "true":
@@ -80,7 +81,7 @@ func GetBoolByStr(s string) bool {
 	return false
 }
 
-//get str by bool
+// get str by bool
 func GetStrByBool(b bool) string {
 	if b {
 		return "1"
@@ -88,13 +89,13 @@ func GetStrByBool(b bool) string {
 	return "0"
 }
 
-//int
+// int
 func GetIntNoErrByStr(str string) int {
 	i, _ := strconv.Atoi(strings.TrimSpace(str))
 	return i
 }
 
-//Get verify value
+// Get verify value
 func Getverifyval(vkey string) string {
 	return crypt.Md5(vkey)
 }
@@ -123,7 +124,7 @@ func Getverifyval(vkey string) string {
 //	}
 //}
 
-//Change headers and host of request
+// Change headers and host of request
 func ChangeHostAndHeader(r *http.Request, host string, header string, addr string, addOrigin bool) {
 	if r.Header.Get("User-Agent") == "" {
 		r.Header.Set("User-Agent", "Lollipop/1.1") //Go-http-client/1.1(默认会添加这个代理，我们将其修改成Lollipop/1.1)
@@ -151,7 +152,7 @@ func ChangeHostAndHeader(r *http.Request, host string, header string, addr strin
 	}
 }
 
-//Read file content by file path
+// Read file content by file path
 func ReadAllFromFile(filePath string) ([]byte, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -171,9 +172,9 @@ func FileExists(name string) bool {
 	return true
 }
 
-//Judge whether the TCP port can open normally
+// Judge whether the TCP port can open normally
 func TestTcpPort(port int) bool {
-	l, err := net.ListenTCP("tcp", &net.TCPAddr{net.ParseIP("0.0.0.0"), port, ""})
+	l, err := net.ListenTCP("tcp4", &net.TCPAddr{net.ParseIP("0.0.0.0"), port, ""})
 	defer func() {
 		if l != nil {
 			l.Close()
@@ -185,9 +186,9 @@ func TestTcpPort(port int) bool {
 	return true
 }
 
-//Judge whether the UDP port can open normally
+// Judge whether the UDP port can open normally
 func TestUdpPort(port int) bool {
-	l, err := net.ListenUDP("udp", &net.UDPAddr{net.ParseIP("0.0.0.0"), port, ""})
+	l, err := net.ListenUDP("udp4", &net.UDPAddr{net.ParseIP("0.0.0.0"), port, ""})
 	defer func() {
 		if l != nil {
 			l.Close()
@@ -199,9 +200,9 @@ func TestUdpPort(port int) bool {
 	return true
 }
 
-//Write length and individual byte data
-//Length prevents sticking
-//# Characters are used to separate data
+// Write length and individual byte data
+// Length prevents sticking
+// # Characters are used to separate data
 func BinaryWrite(raw *bytes.Buffer, v ...string) {
 	b := GetWriteStr(v...)
 	binary.Write(raw, binary.LittleEndian, int32(len(b)))
@@ -220,7 +221,7 @@ func GetWriteStr(v ...string) []byte {
 	return buffer.Bytes()
 }
 
-//inArray str interface
+// inArray str interface
 func InStrArr(arr []string, val string) bool {
 	for _, v := range arr {
 		if v == val {
@@ -230,7 +231,7 @@ func InStrArr(arr []string, val string) bool {
 	return false
 }
 
-//inArray int interface
+// inArray int interface
 func InIntArr(arr []int, val int) bool {
 	for _, v := range arr {
 		if v == val {
@@ -240,7 +241,7 @@ func InIntArr(arr []int, val int) bool {
 	return false
 }
 
-//format ports str to a int array
+// format ports str to a int array
 func GetPorts(p string) []int {
 	var ps []int
 	arr := strings.Split(p, ",")
@@ -264,7 +265,7 @@ func GetPorts(p string) []int {
 	return ps
 }
 
-//is the string a port
+// is the string a port
 func IsPort(p string) bool {
 	pi, err := strconv.Atoi(p)
 	if err != nil {
@@ -276,7 +277,7 @@ func IsPort(p string) bool {
 	return true
 }
 
-//if the s is just a port,return 127.0.0.1:s
+// if the s is just a port,return 127.0.0.1:s
 func FormatAddress(s string) string {
 	if strings.Contains(s, ":") {
 		return s
@@ -284,13 +285,13 @@ func FormatAddress(s string) string {
 	return "127.0.0.1:" + s
 }
 
-//get address from the complete address
+// get address from the complete address
 func GetIpByAddr(addr string) string {
 	arr := strings.Split(addr, ":")
 	return arr[0]
 }
 
-//get port from the complete address
+// get port from the complete address
 func GetPortByAddr(addr string) int {
 	arr := strings.Split(addr, ":")
 	if len(arr) < 2 {
@@ -333,7 +334,65 @@ func CopyBuffer(dst io.Writer, src io.Reader, label ...string) (written int64, e
 	return written, err
 }
 
-//send this ip forget to get a local udp port
+func Changeunit(len int64) string {
+	//1 Byte(B) = 8bit = 8b
+	//1 Kilo    Byte(KB) = 1024B
+	//1 Mega    Byte(MB) = 1024KB
+	//1 Giga    Byte(GB) = 1024MB
+	//1 Tera    Byte(TB) = 1024GB
+	//1 Peta    Byte(PB) = 1024TB
+	//1 Exa     Byte(EB) = 1024PB
+	//1 Zetta   Byte(ZB) = 1024EB
+	//1 Yotta   Byte(YB) = 1024ZB
+	//1 Bronto  Byte(BB) = 1024YB
+	//1 Nona    Byte(NB) = 1024BB
+	//1 Dogga   Byte(DB) = 1024NB
+	//1 Corydon Byte(CB) = 1024DB
+	//1 Xero    Byte(XB) = 1024CB
+
+	var Bit = float64(len)
+	var KB = Bit / 1024
+	var MB = KB / 1024
+	var GB = MB / 1024
+	var TB = GB / 1024
+	var PB = TB / 1024
+	var EB = PB / 1024
+	var ZB = EB / 1024
+	var YB = ZB / 1024
+	var BB = YB / 1024
+	var NB = BB / 1024
+	var CB = NB / 1024
+	var XB = CB / 1024
+	if Bit < 1024 {
+		return fmt.Sprintf("%.0f", math.Floor(Bit*100)/100) + "B"
+	} else if KB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(KB*100)/100) + "KB"
+	} else if MB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(MB*100)/100) + "MB"
+	} else if GB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(GB*100)/100) + "GB"
+	} else if TB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(TB*100)/100) + "TB"
+	} else if PB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(PB*100)/100) + "PB"
+	} else if EB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(EB*100)/100) + "EB"
+	} else if ZB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(ZB*100)/100) + "ZB"
+	} else if YB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(YB*100)/100) + "YB"
+	} else if BB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(BB*100)/100) + "BB"
+	} else if NB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(NB*100)/100) + "NB"
+	} else if CB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(CB*100)/100) + "CB"
+	} else {
+		return fmt.Sprintf("%.2f", math.Floor(XB*100)/100) + "XB"
+	}
+}
+
+// send this ip forget to get a local udp port
 func GetLocalUdpAddr() (net.Conn, error) {
 	tmpConn, err := net.Dial("udp", "114.114.114.114:53")
 	if err != nil {
@@ -342,7 +401,7 @@ func GetLocalUdpAddr() (net.Conn, error) {
 	return tmpConn, tmpConn.Close()
 }
 
-//parse template
+// parse template
 func ParseStr(str string) (string, error) {
 	tmp := template.New("npc")
 	var err error
@@ -356,7 +415,7 @@ func ParseStr(str string) (string, error) {
 	return w.String(), nil
 }
 
-//get env
+// get env
 func GetEnvMap() map[string]string {
 	m := make(map[string]string)
 	environ := os.Environ()
@@ -369,7 +428,7 @@ func GetEnvMap() map[string]string {
 	return m
 }
 
-//throw the empty element of the string array
+// throw the empty element of the string array
 func TrimArr(arr []string) []string {
 	newArr := make([]string, 0)
 	for _, v := range arr {
@@ -380,7 +439,6 @@ func TrimArr(arr []string) []string {
 	return newArr
 }
 
-//
 func IsArrContains(arr []string, val string) bool {
 	if arr == nil {
 		return false
@@ -393,7 +451,7 @@ func IsArrContains(arr []string, val string) bool {
 	return false
 }
 
-//remove value from string array
+// remove value from string array
 func RemoveArrVal(arr []string, val string) []string {
 	for k, v := range arr {
 		if v == val {
@@ -404,7 +462,7 @@ func RemoveArrVal(arr []string, val string) []string {
 	return arr
 }
 
-//convert bytes to num
+// convert bytes to num
 func BytesToNum(b []byte) int {
 	var str string
 	for i := 0; i < len(b); i++ {
@@ -414,7 +472,7 @@ func BytesToNum(b []byte) int {
 	return int(x)
 }
 
-//get the length of the sync map
+// get the length of the sync map
 func GeSynctMapLen(m sync.Map) int {
 	var c int
 	m.Range(func(key, value interface{}) bool {

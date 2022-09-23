@@ -34,6 +34,9 @@ var (
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.Ldate)
+	//log.Print("print")
+	//log.Fatal("Fatal")
 	flag.Parse()
 	// init log
 	if *ver {
@@ -43,6 +46,7 @@ func main() {
 	log.Print(common.GetRunPath())
 	if err := beego.LoadAppConfig("ini", filepath.Join(common.GetRunPath(), "conf", "nps.conf")); err != nil {
 		log.Fatalln("load config file error", err.Error())
+		os.Exit(-1)
 	}
 	common.InitPProfFromFile()
 	if level = beego.AppConfig.String("log_level"); level == "" {
@@ -60,6 +64,7 @@ func main() {
 	}
 	// init service
 	options := make(service.KeyValue)
+	options["optionKeepAlive"] = false
 	svcConfig := &service.Config{
 		Name:        "Nps",
 		DisplayName: "nps内网穿透代理服务器",

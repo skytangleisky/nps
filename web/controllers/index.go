@@ -4,6 +4,7 @@ import (
 	"ehang.io/nps/lib/file"
 	"ehang.io/nps/server"
 	"ehang.io/nps/server/tool"
+	"strconv"
 
 	"github.com/astaxie/beego"
 )
@@ -184,7 +185,7 @@ func (s *IndexController) Edit() {
 func (s *IndexController) Stop() {
 	id := s.GetIntNoErr("id")
 	if err := server.StopServer(id); err != nil {
-		s.AjaxErr("stop error")
+		s.AjaxErr("stop error:" + strconv.Itoa(id) + " not exist!")
 	}
 	s.AjaxOk("stop success")
 }
@@ -200,7 +201,7 @@ func (s *IndexController) Del() {
 func (s *IndexController) Start() {
 	id := s.GetIntNoErr("id")
 	if err := server.StartTask(id); err != nil {
-		s.AjaxErr("start error")
+		s.AjaxErr("start error:" + strconv.Itoa(id) + " not exist!")
 	}
 	s.AjaxOk("start success")
 }

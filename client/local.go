@@ -106,7 +106,7 @@ func StartLocalServer(l *config.LocalServer, config *config.CommonConfig) error 
 		logs.Info("successful start-up of local tcp trans monitoring, port", l.Port)
 		return proxy.NewTunnelModeServer(proxy.HandleTrans, p2pNetBridge, task).Start()
 	case "p2p", "secret":
-		listener, err := net.ListenTCP("tcp", &net.TCPAddr{net.ParseIP("0.0.0.0"), l.Port, ""})
+		listener, err := net.ListenTCP("tcp4", &net.TCPAddr{net.ParseIP("0.0.0.0"), l.Port, ""})
 		if err != nil {
 			logs.Error("local listener startup failed port %d, error %s", l.Port, err.Error())
 			return err
@@ -143,7 +143,7 @@ func handleUdpMonitor(config *config.CommonConfig, l *config.LocalServer) {
 					newUdpConn(tmpConn.LocalAddr().String(), config, l)
 					if udpConn != nil {
 						udpConnStatus = true
-						break
+						return
 					}
 				}
 			}
@@ -157,6 +157,7 @@ func handleSecret(localTcpConn net.Conn, config *config.CommonConfig, l *config.
 		logs.Error("Local connection server failed ", err.Error())
 		return
 	}
+	logs.Alert(l.Password)
 	if _, err := remoteConn.Write([]byte(crypt.Md5(l.Password))); err != nil {
 		logs.Error("Local connection server failed ", err.Error())
 		return
@@ -202,7 +203,7 @@ func newUdpConn(localAddr string, config *config.CommonConfig, l *config.LocalSe
 	}
 	var localConn net.PacketConn
 	var remoteAddress string
-	if remoteAddress, localConn, err = handleP2PUdp(localAddr, string(rAddr), crypt.Md5(l.Password), common.WORK_P2P_VISITOR); err != nil {
+	if remoteAddress, localConn, err = handleP2PUdp2(localAddr, string(rAddr), crypt.Md5(l.Password), common.WORK_P2P_VISITOR); err != nil {
 		logs.Error(err)
 		return
 	}

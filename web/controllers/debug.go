@@ -84,10 +84,10 @@ type DebugController struct {
 	beego.Controller
 }
 
-//连接的客户端,把每个客户端都放进来
+// 连接的客户端,把每个客户端都放进来
 var clients = make(map[*websocket.Conn]bool)
 
-//广播频道(通道)
+// 广播频道(通道)
 var broadcast = make(chan []MyMessage)
 
 // 配置升级程序(升级为websocket)
@@ -156,6 +156,9 @@ func (c *DebugController) Debug() {
 				broadcast <- myMessages
 				break //结束循环
 			} else {
+				if bytes2str(d) == "HEART" {
+					continue
+				}
 				var myMessages = make([]MyMessage, 0)
 				myMessages = append(myMessages, MyMessage{"", "00ff00", bytes2str(d) + "\n"})
 				broadcast <- myMessages
@@ -183,49 +186,49 @@ func decodeANSI(strANSI string) []MyMessage {
 			message.Color = "BBBBBB"
 			break
 		case "\033[1;34m":
-			message.Color = "5394EC"
+			message.Color = "1FB0FF"
 			break
 		case "\033[1;37m":
-			message.Color = "889898"
+			message.Color = "FFFFFF"
 			break
 		case "\033[1;36m":
-			message.Color = "289898"
+			message.Color = "00E5E5"
 			break
 		case "\033[1;35m":
-			message.Color = "9989BD"
+			message.Color = "ED7EED"
 			break
 		case "\033[1;31m":
-			message.Color = "DE6A67"
+			message.Color = "FF4050"
 			break
 		case "\033[1;33m":
-			message.Color = "BBBE54"
+			message.Color = "E5BF00"
 			break
 		case "\033[1;32m":
-			message.Color = "94BF22"
+			message.Color = "4FC414"
 			break
 		case "\033[1;44m":
-			message.Color = "BABAC2"
-			message.Background = "5394EC"
+			message.Color = "FFFFFF"
+			message.Background = "1778BD"
 			break
 		case "\033[42m":
-			message.Color = "BBBBBB"
-			message.Background = "A8C023"
+			message.Color = "4FC414"
+			message.Background = "458500"
 			break
 		case "\033[44m":
-			message.Color = "BBBBBB"
-			message.Background = "5394EC"
+			message.Color = "1FB0FF"
+			message.Background = "1778BD"
 			break
 		case "\033[47m":
-			message.Color = "B4BABA"
-			message.Background = "999999"
+			message.Color = "808080"
+			message.Background = "616161"
 			break
 		case "\033[46m":
-			message.Color = "BBBBBB"
-			message.Background = "299999"
+			message.Color = "00E5E5"
+			message.Background = "006E6E"
 			break
 		case "\033[43m":
-			message.Color = "BBBBBB"
-			message.Background = "D6BF55"
+			message.Color = "E5BF00"
+			message.Background = "A87B00"
 			break
 
 		default:

@@ -69,7 +69,7 @@ func NewTunnel(tunnelPort int, tunnelType string, ipVerify bool, runList sync.Ma
 }
 
 func (s *Bridge) StartTunnel() error {
-	go s.ping()
+	//go s.ping2()//tanglei
 	if s.tunnelType == "kcp" {
 		logs.Info("server start, the bridge type is %s, the bridge port is %d", s.tunnelType, s.TunnelPort)
 		return conn.NewKcpListenerAndProcess(beego.AppConfig.String("bridge_ip")+":"+beego.AppConfig.String("bridge_port"), func(c net.Conn) {
@@ -82,6 +82,7 @@ func (s *Bridge) StartTunnel() error {
 			os.Exit(0)
 			return err
 		}
+		logs.Info("server start, the bridge type is %s, the bridge address is %s", s.tunnelType, listener.Addr())
 		conn.Accept(listener, func(c net.Conn) {
 			s.cliProcess(conn.NewConn(c))
 		})
@@ -89,10 +90,11 @@ func (s *Bridge) StartTunnel() error {
 	return nil
 }
 
-//get health information form client
+// get health information form client
 func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 	for {
 		if info, status, err := c.GetHealthInfo(); err != nil {
+			logs.Error(err)
 			break
 		} else if !status { //the status is true , return target to the targetArr
 			file.GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
@@ -152,9 +154,14 @@ func (s *Bridge) GetHealthFromClient(id int, c *conn.Conn) {
 		}
 	}
 	s.DelClient(id)
+	//if v, ok := s.Client.Load(id); ok {
+	//	if v.(*Client).signal != nil && v.(*Client).signal==c{
+	//		s.DelClient(id)
+	//	}
+	//}
 }
 
-//验证失败，返回错误验证flag，并且关闭连接
+// 验证失败，返回错误验证flag，并且关闭连接
 func (s *Bridge) verifyError(c *conn.Conn) {
 	c.Write([]byte(common.VERIFY_EER))
 }
@@ -166,7 +173,7 @@ func (s *Bridge) verifySuccess(c *conn.Conn) {
 func (s *Bridge) cliProcess(c *conn.Conn) {
 	//read test flag
 	if _, err := c.GetShortContent(3); err != nil {
-		logs.Info("The client %s connect error", c.Conn.RemoteAddr(), err.Error())
+		logs.Info("The client %s connect error: %s", c.Conn.RemoteAddr(), err.Error())
 		return
 	}
 	//version check
@@ -189,6 +196,7 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 	var buf []byte
 	//get vKey from client
 	if buf, err = c.GetShortContent(32); err != nil {
+		c.WriteClose()
 		c.Close()
 		return
 	}
@@ -212,6 +220,7 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 func (s *Bridge) DelClient(id int) {
 	if v, ok := s.Client.Load(id); ok {
 		if v.(*Client).signal != nil {
+			v.(*Client).signal.WriteClose()
 			v.(*Client).signal.Close()
 		}
 		s.Client.Delete(id)
@@ -221,34 +230,49 @@ func (s *Bridge) DelClient(id int) {
 		if c, err := file.GetDb().GetClient(id); err == nil {
 			s.CloseClient <- c.Id
 		}
+		var num int64 = 0
+		s.Client.Range(func(k, v interface{}) bool {
+			num++
+			return true
+		})
+		logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, v.(*Client).signal.Conn.RemoteAddr(), num)
 	}
 }
 
-//use different
+// use different
 func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 	isPub := file.GetDb().IsPubClient(id)
+	logs.Warning(typeVal)
 	switch typeVal {
 	case common.WORK_MAIN:
 		if isPub {
 			c.Close()
 			return
 		}
-		tcpConn, ok := c.Conn.(*net.TCPConn)
+		/*tcpConn, ok := c.Conn.(*net.TCPConn)
 		if ok {
 			// add tcp keep alive option for signal connection
 			_ = tcpConn.SetKeepAlive(true)
-			_ = tcpConn.SetKeepAlivePeriod(5 * time.Second)
-		}
+			_ = tcpConn.SetKeepAlivePeriod(2 * time.Second)
+		}*/
 		//the vKey connect by another ,close the client of before
-		if v, ok := s.Client.LoadOrStore(id, NewClient(nil, nil, c, vs)); ok {
-			if v.(*Client).signal != nil {
-				v.(*Client).signal.WriteClose()
-			}
-			v.(*Client).signal = c
-			v.(*Client).Version = vs
-		}
-		go s.GetHealthFromClient(id, c)
-		logs.Info("clientId %d connection succeeded, address:%s ", id, c.Conn.RemoteAddr())
+		//if v, ok := s.Client.LoadOrStore(id, NewClient(nil, nil, c, vs)); ok {
+		//	if v.(*Client).signal != nil {
+		//		v.(*Client).signal.WriteClose()
+		//	}
+		//	v.(*Client).signal = c
+		//	v.(*Client).Version = vs
+		//}
+
+		s.DelClient(id) //将已经登录的用户注销
+		s.Client.Store(id, NewClient(nil, nil, c, vs))
+		var num int64 = 0
+		s.Client.Range(func(k, v interface{}) bool {
+			num++
+			return true
+		})
+		//go s.GetHealthFromClient(id, c)
+		logs.Info("clientId %d connected successful, address:%s ,Total=%d", id, c.Conn.RemoteAddr(), num)
 	case common.WORK_CHAN:
 		muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
 		if v, ok := s.Client.LoadOrStore(id, NewClient(muxConn, nil, nil, vs)); ok {
@@ -303,7 +327,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 	return
 }
 
-//register ip
+// register ip
 func (s *Bridge) register(c *conn.Conn) {
 	var hour int32
 	if err := binary.Read(c, binary.LittleEndian, &hour); err == nil {
@@ -358,6 +382,28 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 	return
 }
 
+func (s *Bridge) ping2() {
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.Client.Range(func(key, value interface{}) bool {
+				v := value.(*Client)
+				if v.tunnel == nil || v.signal == nil {
+					v.retryTime += 1
+					logs.Warning(v.retryTime)
+				}
+				if (v.tunnel != nil && v.tunnel.IsClose) || v.retryTime >= 3 {
+					logs.Info("the client %d closed", key.(int))
+					s.DelClient(key.(int))
+				}
+				return true
+			})
+		}
+	}
+}
+
 func (s *Bridge) ping() {
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
@@ -387,7 +433,7 @@ func (s *Bridge) ping() {
 	}
 }
 
-//get config and add task from client config
+// get config and add task from client config
 func (s *Bridge) getConfig(c *conn.Conn, isPub bool, client *file.Client) {
 	var fail bool
 loop:

@@ -17,7 +17,7 @@ import (
 var isStart bool
 var serverConn *conn.Conn
 
-func heathCheck(healths []*file.Health, c *conn.Conn) bool {
+func healthCheck(healths []*file.Health, c *conn.Conn) bool {
 	serverConn = c
 	if isStart {
 		for _, v := range healths {
