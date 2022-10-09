@@ -210,6 +210,10 @@ func decodeANSI(strANSI string) []MyMessage {
 			message.Color = "FFFFFF"
 			message.Background = "1778BD"
 			break
+		case "\033[41m":
+			message.Color = "FF4050"
+			message.Background = "772E2C"
+			break
 		case "\033[42m":
 			message.Color = "4FC414"
 			message.Background = "458500"
@@ -229,6 +233,10 @@ func decodeANSI(strANSI string) []MyMessage {
 		case "\033[43m":
 			message.Color = "E5BF00"
 			message.Background = "A87B00"
+			break
+		case "\033[45m":
+			message.Color = "ED7EED"
+			message.Background = "458500"
 			break
 
 		default:
