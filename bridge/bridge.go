@@ -280,6 +280,7 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 					//logs.Notice(string(buf2))
 				} else {
 					s.DelClient(id)
+					break
 				}
 			}
 		}()
