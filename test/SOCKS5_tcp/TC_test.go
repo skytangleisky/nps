@@ -1,7 +1,7 @@
 package tcpClient
 
 import (
-	"ehang.io/nps/lib/conn"
+	"ehang.io/nps/lib/common"
 	"github.com/astaxie/beego/logs"
 	"log"
 	"math/rand"
@@ -32,7 +32,7 @@ func Test_SOCKS5_TC(t *testing.T) {
 		for {
 			select {
 			case <-t.C:
-				logs.Warn(conn.Changeunit(mSen)+"/s", conn.Changeunit(mSenlen), conn.Changeunit(mRev)+"/s", conn.Changeunit(mRevlen))
+				logs.Warn(common.Changeunit(mSen)+"/s", common.Changeunit(mSenlen), common.Changeunit(mRev)+"/s", common.Changeunit(mRevlen))
 				mRev = 0
 				mSen = 0
 				if mRevlen == mSenlen {

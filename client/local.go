@@ -43,6 +43,7 @@ func (p2pBridge *p2pBridge) SendLinkInfo(clientId int, link *conn.Link, t *file.
 	}
 	nowConn, err := muxSession.NewConn()
 	if err != nil {
+		logs.Error(err)
 		udpConn = nil
 		return nil, err
 	}

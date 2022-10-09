@@ -28,7 +28,7 @@ type Client struct {
 	signal    *conn.Conn
 	file      *nps_mux.Mux
 	Version   string
-	retryTime int // it will be add 1 when ping not ok until to 3 will close the client
+	retryTime int // it will be added 1 when ping not ok until to 3 will close the client
 }
 
 func NewClient(t, f *nps_mux.Mux, s *conn.Conn, vs string) *Client {
@@ -273,6 +273,16 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 		})
 		//go s.GetHealthFromClient(id, c)
 		logs.Info("clientId %d connected successful, address:%s ,Total=%d", id, c.Conn.RemoteAddr(), num)
+		go func() {
+			buf2 := make([]byte, 4096)
+			for {
+				if _, err := c.Read(buf2); err == nil {
+					//logs.Notice(string(buf2))
+				} else {
+					s.DelClient(id)
+				}
+			}
+		}()
 	case common.WORK_CHAN:
 		muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
 		if v, ok := s.Client.LoadOrStore(id, NewClient(muxConn, nil, nil, vs)); ok {
@@ -364,6 +374,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			return
 		}
 		if target, err = tunnel.NewConn(); err != nil {
+			logs.Error(err)
 			return
 		}
 		if t != nil && t.Mode == "file" {
