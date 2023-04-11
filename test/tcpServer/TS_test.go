@@ -19,7 +19,7 @@ func Test_TS(t *testing.T) {
 		os.Exit(0)
 	}
 
-	tcpListener, err := net.ListenTCP("tcp4", tcpAddr)
+	tcpListener, err := net.ListenTCP("tcp", tcpAddr)
 	defer tcpListener.Close()
 	if err != nil {
 		logs.Error(err)

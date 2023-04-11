@@ -60,7 +60,7 @@ func (pMux *PortMux) Start() error {
 	if err != nil {
 		return err
 	}
-	pMux.Listener, err = net.ListenTCP("tcp4", tcpAddr)
+	pMux.Listener, err = net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		logs.Error(err)
 		os.Exit(0)

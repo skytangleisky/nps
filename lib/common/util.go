@@ -174,7 +174,7 @@ func FileExists(name string) bool {
 
 // Judge whether the TCP port can open normally
 func TestTcpPort(port int) bool {
-	l, err := net.ListenTCP("tcp4", &net.TCPAddr{net.ParseIP("0.0.0.0"), port, ""})
+	l, err := net.ListenTCP("tcp", &net.TCPAddr{net.ParseIP("0.0.0.0"), port, ""})
 	defer func() {
 		if l != nil {
 			l.Close()

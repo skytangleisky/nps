@@ -310,7 +310,7 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 func (s *httpServer) NewServerTCP(port int, scheme string) {
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(port))
-	tcpListener, err := net.ListenTCP("tcp4", tcpAddr)
+	tcpListener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		logs.Error(err)
 	} else {

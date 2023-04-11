@@ -269,7 +269,7 @@ func run() {
 		go client.StartFromFile(*configPath)
 	}
 	beego.Router("/debug", &controllers.DebugController{}, "*:Debug")
-	if l, error := net.ListenTCP("tcp4", &net.TCPAddr{net.ParseIP("0.0.0.0"), 7778, ""}); error == nil {
+	if l, error := net.ListenTCP("tcp", &net.TCPAddr{net.ParseIP("0.0.0.0"), 7778, ""}); error == nil {
 		beego.InitBeforeHTTPRun()
 		er := http.Serve(l, beego.BeeApp.Handlers)
 		if er != nil {
