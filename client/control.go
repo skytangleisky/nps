@@ -210,7 +210,10 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 				connection, err = NewHttpProxyConn(u, server)
 			}
 		} else {
-			connection, err = net.Dial("tcp", server)
+			connection, err = net.Dial("tcp6", server)
+			if err != nil {
+				connection, err = net.Dial("tcp", server)
+			}
 		}
 	} else {
 		sess, err = kcp.DialWithOptions(server, nil, 10, 3)
