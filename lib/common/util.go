@@ -287,8 +287,17 @@ func FormatAddress(s string) string {
 
 // get address from the complete address
 func GetIpByAddr(addr string) string {
-	arr := strings.Split(addr, ":")
-	return arr[0]
+	count := strings.Count(addr, ":")
+	if count == 0 {
+		return addr
+	} else if count == 1 {
+		arr := strings.Split(addr, ":")
+		return arr[0]
+	} else {
+		arr := strings.Split(addr, ":")
+		arr = arr[0 : len(arr)-1]
+		return strings.Join(arr, ":")
+	}
 }
 
 // get port from the complete address

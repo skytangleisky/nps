@@ -237,19 +237,26 @@ func InstallNpc() {
 	copyStaticFile(common.GetAppPath(), "npc")
 }
 
+// go_build_ehang_io_nps_cmd_nps.exe install -config=c:\"Program Files"\nps\conf\nps.conf
 func InstallNps() string {
 	path := common.GetInstallPath()
-	if common.FileExists(path) {
-		MkidrDirAll(path, "web/static", "web/views")
-	} else {
-		MkidrDirAll(path, "conf", "web/static", "web/views")
-		// not copy config if the config file is exist
-		if err := CopyDir(filepath.Join(common.GetAppPath(), "conf"), filepath.Join(path, "conf")); err != nil {
-			log.Fatalln(err)
+	var binPath string
+	if path != common.GetAppPath() { //如果安装路径和程序路径不一致,执行拷贝操作后返回可执行程序路径
+		if common.FileExists(path) {
+			MkidrDirAll(path, "web/static", "web/views")
+		} else {
+			MkidrDirAll(path, "conf", "web/static", "web/views")
+			// not copy config if the config file is exist
+			if err := CopyDir(filepath.Join(common.GetAppPath(), "conf"), filepath.Join(path, "conf")); err != nil {
+				log.Fatalln(err)
+			}
+			chMod(filepath.Join(path, "conf"), 0766)
 		}
-		chMod(filepath.Join(path, "conf"), 0766)
+		binPath = copyStaticFile(common.GetAppPath(), "nps")
+	} else { //如果安装路径和程序路径不一致，不执行拷贝操作，直接返回可执行程序路径
+		binPath, _ = filepath.Abs(os.Args[0])
 	}
-	binPath := copyStaticFile(common.GetAppPath(), "nps")
+	log.Println(common.GetInstallPath(), common.GetAppPath())
 	log.Println("install ok!")
 	log.Println("Static files and configuration files in the current directory will be useless")
 	log.Println("The new configuration file is located in", path, "you can edit them")
@@ -309,7 +316,7 @@ func CopyDir(srcPath string, destPath string) error {
 	return err
 }
 
-//生成目录并拷贝文件
+// 生成目录并拷贝文件
 func copyFile(src, dest string) (w int64, err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -344,7 +351,7 @@ func copyFile(src, dest string) (w int64, err error) {
 	return io.Copy(dstFile, srcFile)
 }
 
-//检测文件夹路径时候存在
+// 检测文件夹路径时候存在
 func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
