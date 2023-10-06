@@ -12,7 +12,7 @@ var cl *client.TRPClient
 
 //export StartClientByVerifyKey
 func StartClientByVerifyKey(serverAddr, verifyKey, connType, proxyUrl *C.char) int {
-	_ = logs.SetLogger("store")
+	_ = logs.SetLogger(nil, "store")
 	if cl != nil {
 		cl.Close()
 	}
