@@ -83,7 +83,8 @@ func GetConfigPath() string {
 	if IsWindows() {
 		path = filepath.Join(GetAppPath(), "conf/npc.conf")
 	} else {
-		path = "conf/npc.conf"
+		// path = "conf/npc.conf"
+		path = filepath.Join(GetAppPath(), "conf/npc.conf")
 	}
 	return path
 }
