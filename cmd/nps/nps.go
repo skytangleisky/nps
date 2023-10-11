@@ -1,7 +1,14 @@
 package main
 
 import (
+	"ehang.io/nps/lib/file"
+	"ehang.io/nps/lib/install"
+	"ehang.io/nps/lib/version"
+	"ehang.io/nps/server"
+	"ehang.io/nps/server/connection"
+	"ehang.io/nps/server/tool"
 	"ehang.io/nps/web/controllers"
+	"ehang.io/nps/web/routers"
 	"flag"
 	"log"
 	"os"
@@ -10,15 +17,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
-
-	"ehang.io/nps/lib/file"
-	"ehang.io/nps/lib/install"
-	"ehang.io/nps/lib/version"
-	"ehang.io/nps/server"
-	"ehang.io/nps/server/connection"
-	"ehang.io/nps/server/tool"
-	"ehang.io/nps/web/routers"
 
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/crypt"
@@ -228,17 +226,17 @@ func run() {
 	}
 	go server.StartNewServer(bridgePort, task, beego.AppConfig.String("bridge_type"), timeout)
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			tcpCount := 0
-			file.GetDb().JsonDb.Clients.Range(func(key, value interface{}) bool {
-				tcpCount += int(value.(*file.Client).NowConn)
-				return true
-			})
-			logs.Error(tcpCount)
-		}
-	}
+	//ticker := time.NewTicker(1 * time.Second)
+	//defer ticker.Stop()
+	//for {
+	//	select {
+	//	case <-ticker.C:
+	//		tcpCount := 0
+	//		file.GetDb().JsonDb.Clients.Range(func(key, value interface{}) bool {
+	//			tcpCount += int(value.(*file.Client).NowConn)
+	//			return true
+	//		})
+	//		logs.Error(tcpCount)
+	//	}
+	//}
 }

@@ -119,6 +119,67 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		host       *file.Host
 		target     net.Conn
 		err        error
+		connClient net.Conn
+		//scheme     = r.URL.Scheme
+		lk         *conn.Link
+		targetAddr string
+		isReset    bool
+	)
+	defer func() {
+		if connClient != nil {
+			connClient.Close()
+		} else {
+			s.writeConnFail(c.Conn)
+		}
+		c.Close()
+	}()
+	//reset:
+	if isReset {
+		host.Client.AddConn()
+	}
+	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
+		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
+		return
+	}
+	if err := s.CheckFlowAndConnNum(host.Client); err != nil {
+		logs.Warn("client id %d, host id %d, error %s, when https connection", host.Client.Id, host.Id, err.Error())
+		return
+	}
+	if !isReset {
+		defer host.Client.AddConn()
+	}
+	if err = s.auth(r, c, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+		logs.Warn("auth error", err, r.RemoteAddr)
+		return
+	}
+	if targetAddr, err = host.Target.GetRandomTarget(); err != nil {
+		logs.Warn(err.Error())
+		return
+	}
+	lk = conn.NewLink("http", targetAddr, host.Client.Cnf.Crypt, host.Client.Cnf.Compress, r.RemoteAddr, host.Target.LocalProxy)
+	if target, err = s.bridge.SendLinkInfo(host.Client.Id, lk, nil); err != nil {
+		logs.Notice("connect to target %s error %s", lk.Host, err)
+		return
+	}
+	connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+
+	//change the host and header and set proxy setting
+	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
+	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
+
+	err = r.Write(connClient)
+	if err != nil {
+		logs.Error(err)
+		return
+	}
+	conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
+	//conn.CopyWaitGroup(connClient, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)//错误用法
+}
+func (s *httpServer) handleHttp2(c *conn.Conn, r *http.Request) {
+	var (
+		host       *file.Host
+		target     net.Conn
+		err        error
 		connClient io.ReadWriteCloser
 		//scheme     = r.URL.Scheme
 		lk         *conn.Link
@@ -163,6 +224,9 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		logs.Notice("connect to target %s error %s", lk.Host, err)
 		return
 	}
+	//change the host and header and set proxy setting
+	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
+	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
 	connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
 
 	//read from inc-client
@@ -212,9 +276,6 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		}
 	}()
 
-	//change the host and header and set proxy setting
-	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
-	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
 	//write
 	lenConn = conn.NewLenConn(connClient)
 

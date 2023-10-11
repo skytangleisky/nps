@@ -1,9 +1,11 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"ehang.io/nps/nps-mux"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -276,29 +278,40 @@ func (s *TRPClient) handleChan(src net.Conn) {
 	lk.Host = common.FormatAddress(lk.Host)
 	//if Conn type is http, read the request and log
 	if lk.ConnType == "http" {
-		if targetConn, err := net.DialTimeout(common.CONN_TCP, lk.Host, lk.Option.Timeout); err != nil {
+		if c, err := net.DialTimeout(common.CONN_TCP, lk.Host, lk.Option.Timeout); err != nil {
 			logs.Warn("connect to %s error %s", lk.Host, err.Error())
 			src.Close()
 		} else {
-			logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
-			conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, nil)
-			/*srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
-			go func() {
-				common.CopyBuffer(srcConn, targetConn)
-				srcConn.Close()
-				targetConn.Close()
-			}()
+			targetConn := conn.NewConn(c)
+			srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
 			if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
 				srcConn.Close()
 				targetConn.Close()
 				return
 			} else {
-				logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
+				logs.Trace("new %s connection with the goal of %s, method %s, host %s, url %s, remote address %s", lk.ConnType, lk.Host, r.Method, r.Host, r.URL.Path, r.RemoteAddr)
 				r.Write(targetConn)
 			}
-			common.CopyBuffer(targetConn, srcConn)
-			srcConn.Close()
-			targetConn.Close()*/
+			conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, targetConn.Rb)
+			//conn.CopyWaitGroup(srcConn, targetConn, lk.Crypt, lk.Compress, nil, nil, false, nil)//错误用法
+
+			//srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
+			//if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
+			//	srcConn.Close()
+			//	targetConn.Close()
+			//	return
+			//} else {
+			//	logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
+			//	r.Write(targetConn)
+			//}
+			//go func() {
+			//	common.CopyBuffer(srcConn, targetConn)
+			//	srcConn.Close()
+			//	targetConn.Close()
+			//}()
+			//common.CopyBuffer(targetConn, srcConn)
+			//srcConn.Close()
+			//targetConn.Close()
 		}
 		return
 	}
