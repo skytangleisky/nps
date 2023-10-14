@@ -61,7 +61,7 @@ func Test_tiles(t *testing.T) {
 		atomic.AddInt64(&count, -1)
 	})
 	go func() {
-		http.ListenAndServeTLS(":3210", "conf/9983347_tanglei.site.pem", "conf/9983347_tanglei.site.key", handler)
+		http.ListenAndServeTLS(":3210", "../conf/9983347_tanglei.site.pem", "../conf/9983347_tanglei.site.key", handler)
 	}()
 	http.ListenAndServe(":3211", h2c.NewHandler(handler, &http2.Server{}))
 	//http.ListenAndServe(":3211", handler)
