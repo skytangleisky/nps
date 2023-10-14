@@ -15,7 +15,6 @@ require (
 	github.com/shirou/gopsutil/v3 v3.21.3
 	github.com/xtaci/kcp-go v5.4.20+incompatible
 	github.com/xtaci/kcp-go/v5 v5.6.1
-	github.com/xtaci/smux v1.5.16
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57
 )

@@ -1,7 +1,7 @@
 package bridge
 
 import (
-	"ehang.io/nps/nps-mux"
+	"ehang.io/nps/smux"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -24,14 +24,14 @@ import (
 )
 
 type Client struct {
-	tunnel    *nps_mux.Mux
+	tunnel    *smux.Session
 	signal    *conn.Conn
-	file      *nps_mux.Mux
+	file      *smux.Session
 	Version   string
 	retryTime int // it will be added 1 when ping not ok until to 3 will close the client
 }
 
-func NewClient(t, f *nps_mux.Mux, s *conn.Conn, vs string) *Client {
+func NewClient(t, f *smux.Session, s *conn.Conn, vs string) *Client {
 	return &Client{
 		signal:  s,
 		tunnel:  t,
@@ -285,7 +285,8 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			}
 		}()
 	case common.WORK_CHAN:
-		muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
+		//muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
+		muxConn, _ := smux.Client(c.Conn, nil)
 		if v, ok := s.Client.LoadOrStore(id, NewClient(muxConn, nil, nil, vs)); ok {
 			v.(*Client).tunnel = muxConn
 		}
@@ -306,7 +307,8 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 			logs.Error("secret error, failed to match the key successfully")
 		}
 	case common.WORK_FILE:
-		muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
+		//muxConn := nps_mux.NewMux(c.Conn, s.tunnelType, s.disconnectTime)
+		muxConn, _ := smux.Client(c.Conn, nil)
 		if v, ok := s.Client.LoadOrStore(id, NewClient(nil, muxConn, nil, vs)); ok {
 			v.(*Client).file = muxConn
 		}
@@ -364,7 +366,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 				}
 			}
 		}
-		var tunnel *nps_mux.Mux
+		var tunnel *smux.Session
 		if t != nil && t.Mode == "file" {
 			tunnel = v.(*Client).file
 		} else {
@@ -374,7 +376,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			err = errors.New("the client connect error")
 			return
 		}
-		if target, err = tunnel.NewConn(); err != nil {
+		if target, err = tunnel.OpenStream(); err != nil {
 			logs.Error(err)
 			return
 		}
@@ -406,7 +408,7 @@ func (s *Bridge) ping2() {
 					v.retryTime += 1
 					logs.Warning(v.retryTime)
 				}
-				if (v.tunnel != nil && v.tunnel.IsClose) || v.retryTime >= 3 {
+				if (v.tunnel != nil && v.tunnel.IsClosed()) || v.retryTime >= 3 {
 					logs.Info("the client %d closed", key.(int))
 					s.DelClient(key.(int))
 				}
@@ -432,7 +434,7 @@ func (s *Bridge) ping() {
 					}
 					return true
 				}
-				if v.tunnel.IsClose {
+				if v.tunnel.IsClosed() {
 					arr = append(arr, key.(int))
 				}
 				return true

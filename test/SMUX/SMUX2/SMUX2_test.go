@@ -2,10 +2,9 @@ package SMUX2
 
 import (
 	"ehang.io/nps/lib/common"
+	"ehang.io/nps/smux"
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go/v5"
-	"github.com/xtaci/smux"
-	"io"
 	"log"
 	"math/rand"
 	"net"
@@ -60,7 +59,7 @@ func handleConnection(conn net.Conn) {
 	//		s.Write(buf[:n])
 	//	}
 	//}(conn)
-	go func(conn io.ReadWriteCloser) {
+	go func(conn net.Conn) {
 		session, _ := smux.Server(conn, nil)
 		for {
 			if s, err := session.AcceptStream(); err == nil {

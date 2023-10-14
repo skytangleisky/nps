@@ -3,7 +3,7 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"ehang.io/nps/nps-mux"
+	"ehang.io/nps/smux"
 	"net"
 	"net/http"
 	"os"
@@ -26,7 +26,7 @@ type TRPClient struct {
 	proxyUrl       string
 	vKey           string
 	p2pAddr        map[string]string
-	tunnel         *nps_mux.Mux
+	tunnel         *smux.Session
 	signal         *conn.Conn
 	ticker         *time.Ticker
 	cnf            *config.Config
@@ -239,9 +239,10 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 			conn.SetUdpSession(udpTunnel)
 			logs.Trace("successful connection with client ,address %s", udpTunnel.RemoteAddr().String())
 			//read link info from remote
-			conn.Accept(nps_mux.NewMux(udpTunnel, s.bridgeConnType, s.disconnectTime), func(c net.Conn) {
-				go s.handleChan(c)
-			})
+			//conn.Accept(nps_mux.NewMux(udpTunnel, s.bridgeConnType, s.disconnectTime), func(c net.Conn) {
+			//conn.Accept(listener, func(c net.Conn) {
+			//	go s.handleChan(c)
+			//})
 			break
 		}
 	}
@@ -255,7 +256,8 @@ func (s *TRPClient) newChan() {
 		return
 	}
 	logs.Info("%s -> %s", tunnel.LocalAddr(), s.svrAddr)
-	s.tunnel = nps_mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime)
+	//s.tunnel = nps_mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime)
+	s.tunnel, _ = smux.Server(tunnel.Conn, nil)
 	for {
 		src, err := s.tunnel.Accept()
 		if err != nil {
@@ -395,7 +397,7 @@ loop:
 	for {
 		select {
 		case <-s.ticker.C:
-			if s.tunnel != nil && s.tunnel.IsClose {
+			if s.tunnel != nil && s.tunnel.IsClosed() {
 				s.Close()
 				break loop
 			}
@@ -412,7 +414,7 @@ loop:
 			buffer.WriteString("1234")
 			s.signal.Write(buffer.Bytes()) //对一次连接中 三个TCP连接 的第二个连接 保活 (和bridge.go中的ping()方法是否有关？)
 			//logs.Info(buffer.String())
-			if s.tunnel != nil && s.tunnel.IsClose {
+			if s.tunnel != nil && s.tunnel.IsClosed() {
 				s.Close()
 				break loop
 			}

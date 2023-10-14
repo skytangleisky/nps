@@ -1,7 +1,7 @@
 package client
 
 import (
-	"ehang.io/nps/nps-mux"
+	"ehang.io/nps/smux"
 	"errors"
 	"net"
 	"net/http"
@@ -22,7 +22,7 @@ import (
 var (
 	LocalServer   []*net.TCPListener
 	udpConn       net.Conn
-	muxSession    *nps_mux.Mux
+	muxSession    *smux.Session
 	fileServer    []*http.Server
 	p2pNetBridge  *p2pBridge
 	lock          sync.RWMutex
@@ -41,7 +41,7 @@ func (p2pBridge *p2pBridge) SendLinkInfo(clientId int, link *conn.Link, t *file.
 		}
 		runtime.Gosched() // waiting for another goroutine establish the mux connection
 	}
-	nowConn, err := muxSession.NewConn()
+	nowConn, err := muxSession.OpenStream()
 	if err != nil {
 		logs.Error(err)
 		udpConn = nil
@@ -64,18 +64,19 @@ func CloseLocalServer() {
 }
 
 func startLocalFileServer(config *config.CommonConfig, t *file.Tunnel, vkey string) {
-	remoteConn, err := NewConn(config.Tp, vkey, config.Server, common.WORK_FILE, config.ProxyUrl)
-	if err != nil {
-		logs.Error("Local connection server failed ", err.Error())
-		return
-	}
-	srv := &http.Server{
-		Handler: http.StripPrefix(t.StripPre, http.FileServer(http.Dir(t.LocalPath))),
-	}
-	logs.Info("start local file system, local path %s, strip prefix %s ,remote port %s ", t.LocalPath, t.StripPre, t.Ports)
-	fileServer = append(fileServer, srv)
-	listener := nps_mux.NewMux(remoteConn.Conn, common.CONN_TCP, config.DisconnectTime)
-	logs.Error(srv.Serve(listener))
+	//remoteConn, err := NewConn(config.Tp, vkey, config.Server, common.WORK_FILE, config.ProxyUrl)
+	//if err != nil {
+	//	logs.Error("Local connection server failed ", err.Error())
+	//	return
+	//}
+	//srv := &http.Server{
+	//	Handler: http.StripPrefix(t.StripPre, http.FileServer(http.Dir(t.LocalPath))),
+	//}
+	//logs.Info("start local file system, local path %s, strip prefix %s ,remote port %s ", t.LocalPath, t.StripPre, t.Ports)
+	//fileServer = append(fileServer, srv)
+	//listener, _ := smux.Server(remoteConn.Conn, nil)
+	////listener := nps_mux.NewMux(remoteConn.Conn, common.CONN_TCP, config.DisconnectTime)
+	//logs.Error(srv.Serve(listener))
 }
 
 func StartLocalServer(l *config.LocalServer, config *config.CommonConfig) error {
@@ -216,6 +217,7 @@ func newUdpConn(localAddr string, config *config.CommonConfig, l *config.LocalSe
 	logs.Trace("successful create a connection with server", remoteAddress)
 	conn.SetUdpSession(udpTunnel)
 	udpConn = udpTunnel
-	muxSession = nps_mux.NewMux(udpConn, "kcp", config.DisconnectTime)
+	//muxSession = nps_mux.NewMux(udpConn, "kcp", config.DisconnectTime)
+	muxSession, _ = smux.Client(udpConn, nil)
 	p2pNetBridge = &p2pBridge{}
 }

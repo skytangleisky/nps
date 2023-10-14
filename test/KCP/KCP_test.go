@@ -2,7 +2,7 @@ package kcp
 
 import (
 	"ehang.io/nps/lib/common"
-	"ehang.io/nps/nps-mux"
+	"ehang.io/nps/smux"
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go/v5"
 	"log"
@@ -129,7 +129,8 @@ func Test_KMS(t *testing.T) {
 			}
 			logs.Info("A client connected :" + conn.RemoteAddr().String())
 			//conn.SetUdpSession(kcpConn)
-			muxSession := nps_mux.NewMux(conn, "tcp", 0)
+			//muxSession := nps_mux.NewMux(conn, "tcp", 0)
+			muxSession, _ := smux.Client(conn, nil)
 			peer, _ := muxSession.Accept()
 			go func(conn net.Conn) {
 				ipStr := conn.RemoteAddr().String()
@@ -196,8 +197,9 @@ func Test_KMC(t *testing.T) {
 		//conn.SetUdpSession(sess)
 		//sess.SetDeadline(time.Now().Add(time.Second * 5))
 
-		muxSession := nps_mux.NewMux(sess, "tcp", 0)
-		client, _ := muxSession.NewConn()
+		//muxSession := nps_mux.NewMux(sess, "tcp", 0)
+		muxSession, _ := smux.Client(sess, nil)
+		client, _ := muxSession.OpenStream()
 		go func(client net.Conn) {
 			buf2 := make([]byte, 32768)
 			for {
