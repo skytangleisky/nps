@@ -160,10 +160,6 @@ func (httpsListener *HttpsListener) Addr() net.Addr {
 func GetServerNameFromClientHello(c net.Conn) (string, []byte) {
 	buf := make([]byte, 4096)
 	data := make([]byte, 4096)
-	defer func() {
-		buf = nil
-		data = nil
-	}()
 	n, err := c.Read(buf)
 	if err != nil {
 		return "", nil
