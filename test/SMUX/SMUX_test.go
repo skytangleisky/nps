@@ -2,13 +2,14 @@ package SMUX
 
 import (
 	"ehang.io/nps/lib/common"
+	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/smux"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestEcho(t *testing.T) {
@@ -19,26 +20,48 @@ func TestEcho(t *testing.T) {
 	defer stop()
 	session, _ := smux.Client(cli, nil)
 	stream, _ := session.OpenStream()
+	defer func() {
+		stream.Close()
+		session.Close()
+	}()
 	var wg sync.WaitGroup
 	buf := make([]byte, 1024*1024)
 	buf1 := make([]byte, 1024*1024*1024)
 	rand.Read(buf1)
+	var mRevlen int64 = 0
+	var mSenlen int64
+	var mRev int64
+	var mSen int64
+	mSenlen += int64(len(buf1))
+	mSen += int64(len(buf1))
 	go func() {
-		var len = int64(0)
+		t := time.NewTicker(time.Second)
+		for {
+			select {
+			case <-t.C:
+				logs.Warn(common.Changeunit(mSen)+"/s", common.Changeunit(mSenlen), common.Changeunit(mRev)+"/s", common.Changeunit(mRevlen))
+				mRev = 0
+				mSen = 0
+				if mRevlen == mSenlen {
+					wg.Done()
+				}
+			}
+		}
+	}()
+
+	go func() {
 		for {
 			if n, err := stream.Read(buf); err == nil {
-				len += int64(n)
+				mRev += int64(n)
+				mRevlen += int64(n)
 			} else {
-				log.Fatal(err)
+				//log.Fatal(err)
 			}
-			log.Print(common.Changeunit(len))
 		}
 	}()
 	stream.Write(buf1)
 	wg.Add(1)
 	wg.Wait()
-
-	session.Close()
 }
 
 // setupServer starts new server listening on a random localhost port and

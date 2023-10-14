@@ -118,17 +118,18 @@ func Test_KMS(t *testing.T) {
 	logs.SetLogFuncCallDepth(3)
 	//key := pbkdf2.Key([]byte("demo pass"), []byte("demo salt"), 1024, 32, sha1.New)
 	//block, _ := kcp.NewAESBlockCrypt(key)
-	if listener, err := kcp.Listen("0.0.0.0:4444"); err == nil {
+	//if listener, err := kcp.Listen("0.0.0.0:4444"); err == nil {
+	if listener, err := net.Listen("tcp", ":4444"); err == nil {
 		logs.Info(listener.Addr().String())
 		for {
-			kcpConn, err := listener.Accept()
+			conn, err := listener.Accept()
 			if err != nil {
 				logs.Error(err)
 				break
 			}
-			logs.Info("A client connected :" + kcpConn.RemoteAddr().String())
+			logs.Info("A client connected :" + conn.RemoteAddr().String())
 			//conn.SetUdpSession(kcpConn)
-			muxSession := nps_mux.NewMux(kcpConn, "kcp", 0)
+			muxSession := nps_mux.NewMux(conn, "tcp", 0)
 			peer, _ := muxSession.Accept()
 			go func(conn net.Conn) {
 				ipStr := conn.RemoteAddr().String()
@@ -190,11 +191,12 @@ func Test_KMC(t *testing.T) {
 	}()
 
 	// dial to the echo server
-	if sess, err := kcp.Dial("127.0.0.1:4444"); err == nil {
+	//if sess, err := kcp.Dial("127.0.0.1:4444"); err == nil {
+	if sess, err := net.Dial("tcp", "127.0.0.1:4444"); err == nil {
 		//conn.SetUdpSession(sess)
 		//sess.SetDeadline(time.Now().Add(time.Second * 5))
 
-		muxSession := nps_mux.NewMux(sess, "kcp", 0)
+		muxSession := nps_mux.NewMux(sess, "tcp", 0)
 		client, _ := muxSession.NewConn()
 		go func(client net.Conn) {
 			buf2 := make([]byte, 32768)
