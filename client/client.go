@@ -222,7 +222,7 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 		logs.Error(err)
 		return
 	}
-	l, err := kcp.ServeConn(nil, 150, 3, localConn)
+	l, err := kcp.ServeConn(nil, 15, 3, localConn)
 	if err != nil {
 		logs.Error(err)
 		return

@@ -19,7 +19,7 @@ func NewTcpListenerAndProcess(addr string, f func(c net.Conn), listener *net.Lis
 }
 
 func NewKcpListenerAndProcess(addr string, f func(c net.Conn)) error {
-	kcpListener, err := kcp.ListenWithOptions(addr, nil, 150, 3)
+	kcpListener, err := kcp.ListenWithOptions(addr, nil, 10, 3)
 	if err != nil {
 		logs.Error(err)
 		return err

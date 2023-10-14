@@ -325,23 +325,19 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err erro
 		if v.IsClose {
 			return true
 		}
-		//Remove http(s) http(s)://a.proxy.com
-		//*.proxy.com *.a.proxy.com  Do some pan-parsing
-		if v.Scheme != "all" && v.Scheme != r.URL.Scheme {
-			return true
-		}
-		tmpHost := v.Host
-		if strings.Contains(tmpHost, "*") {
-			tmpHost = strings.Replace(tmpHost, "*", "", -1)
-			if strings.Contains(host, tmpHost) {
+		if v.Scheme == "all" || v.Scheme == r.URL.Scheme {
+			tmpHost := v.Host
+			if strings.Contains(tmpHost, "*") {
+				tmpHost = strings.Replace(tmpHost, "*", "", -1)
+				if strings.Contains(host, tmpHost) {
+					hosts = append(hosts, v)
+				}
+			} else if v.Host == host {
 				hosts = append(hosts, v)
 			}
-		} else if v.Host == host {
-			hosts = append(hosts, v)
 		}
 		return true
 	})
-
 	for _, v := range hosts {
 		//If not set, default matches all
 		if v.Location == "" {
@@ -350,12 +346,16 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err erro
 		//tanglei
 		//if strings.Index(r.RequestURI, v.Location) == 0 {//http代理访问有问题
 		//if strings.Index(r.URL.Path, v.Location) == 0 {//https代理访问有问题
-		if strings.Index(r.URL.Path, v.Location) == 0 || strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
+		//if strings.Index(r.URL.Path, v.Location) == 0 || strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
+		//	if h == nil || (len(v.Location) > len(h.Location)) {
+		//		h = v
+		//	}
+		//}
+		if strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
 			if h == nil || (len(v.Location) > len(h.Location)) {
 				h = v
 			}
 		}
-
 	}
 	if h != nil {
 		return

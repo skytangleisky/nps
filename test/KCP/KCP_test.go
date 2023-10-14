@@ -1,10 +1,9 @@
-package KCP
+package kcp
 
 import (
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/nps-mux"
 	"github.com/astaxie/beego/logs"
-	"github.com/xtaci/kcp-go"
 	"github.com/xtaci/kcp-go/v5"
 	"log"
 	"math/rand"
@@ -21,7 +20,7 @@ func Test_KS(t *testing.T) {
 	logs.SetLogFuncCallDepth(3)
 	//key := pbkdf2.Key([]byte("demo pass"), []byte("demo salt"), 1024, 32, sha1.New)
 	//block, _ := kcp.NewAESBlockCrypt(key)
-	if listener, err := kcp.Listen("0.0.0.0:6666"); err == nil {
+	if listener, err := kcp.Listen("0.0.0.0:4444"); err == nil {
 		//if listener, err := net.Listen("tcp","0.0.0.0:6666"); err == nil {
 		logs.Info(listener.Addr().String())
 		for {
@@ -88,7 +87,7 @@ func Test_KC(t *testing.T) {
 	}()
 
 	// dial to the echo server
-	if sess, err := kcp.Dial("127.0.0.1:6666"); err == nil {
+	if sess, err := kcp.Dial("127.0.0.1:4444"); err == nil {
 		//if sess, err := net.Dial("tcp","127.0.0.1:6666"); err == nil {
 		go func() {
 			buf2 := make([]byte, 4096)
@@ -119,7 +118,7 @@ func Test_KMS(t *testing.T) {
 	logs.SetLogFuncCallDepth(3)
 	//key := pbkdf2.Key([]byte("demo pass"), []byte("demo salt"), 1024, 32, sha1.New)
 	//block, _ := kcp.NewAESBlockCrypt(key)
-	if listener, err := kcp.Listen("0.0.0.0:7777"); err == nil {
+	if listener, err := kcp.Listen("0.0.0.0:4444"); err == nil {
 		logs.Info(listener.Addr().String())
 		for {
 			kcpConn, err := listener.Accept()
@@ -170,7 +169,7 @@ func Test_KMC(t *testing.T) {
 	var mSen int64
 	var wg sync.WaitGroup
 	wg.Add(1)
-	buf1 := make([]byte, 1024*1024*1024*100)
+	buf1 := make([]byte, 1024*1024*100)
 	//rand.Read(buf1)
 	mSenlen = int64(len(buf1))
 	mSen += int64(len(buf1))
@@ -191,7 +190,7 @@ func Test_KMC(t *testing.T) {
 	}()
 
 	// dial to the echo server
-	if sess, err := kcp.Dial("127.0.0.1:7777"); err == nil {
+	if sess, err := kcp.Dial("127.0.0.1:4444"); err == nil {
 		//conn.SetUdpSession(sess)
 		//sess.SetDeadline(time.Now().Add(time.Second * 5))
 

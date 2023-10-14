@@ -58,20 +58,40 @@ func (s *httpServer) Start() error {
 		s.errorContent = []byte("nps 404")
 	}
 	if s.httpPort > 0 {
-		//s.httpServer = s.NewServer(s.httpPort, "http")
-		//go func() {
-		//	l, err := connection.GetHttpListener()
-		//	if err != nil {
-		//		logs.Error(err)
-		//		os.Exit(0)
-		//	}
-		//	err = s.httpServer.Serve(l)
-		//	if err != nil {
-		//		logs.Error(err)
-		//		os.Exit(0)
-		//	}
-		//}()
-		s.NewServerTCP(s.httpPort, "http")
+		s.httpServer = s.NewServer(s.httpPort, "http")
+		go func() {
+			l, err := connection.GetHttpListener()
+			if err != nil {
+				logs.Error(err)
+				os.Exit(0)
+			}
+			err = s.httpServer.Serve(l)
+			if err != nil {
+				logs.Error(err)
+				os.Exit(0)
+			}
+		}()
+		//tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(s.httpPort))
+		//tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+		//if err != nil {
+		//	logs.Error(err)
+		//  os.Exit(0)
+		//} else {
+		//	go func() {
+		//		for {
+		//			tcpConn, err := tcpListener.AcceptTCP()
+		//			if err != nil {
+		//				logs.Error(err)
+		//				tcpConn.Close()
+		//			} else {
+		//				go func() {
+		//					s.Process(tcpConn)
+		//				}()
+		//			}
+		//
+		//		}
+		//	}()
+		//}
 
 	}
 	if s.httpsPort > 0 {
@@ -366,29 +386,6 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 		}),
 		// Disable HTTP/2.
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
-	}
-}
-func (s *httpServer) NewServerTCP(port int, scheme string) {
-
-	tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(port))
-	tcpListener, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		logs.Error(err)
-	} else {
-		go func() {
-			for {
-				tcpConn, err := tcpListener.AcceptTCP()
-				if err != nil {
-					logs.Error(err)
-					tcpConn.Close()
-				} else {
-					go func() {
-						s.Process(tcpConn)
-					}()
-				}
-
-			}
-		}()
 	}
 }
 
