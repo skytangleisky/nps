@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bufio"
 	"crypto/tls"
 	"io"
 	"net"
@@ -389,12 +388,12 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 	}
 }
 
-func (s *httpServer) Process(tcpConn *net.TCPConn) {
-	if r, err := http.ReadRequest(bufio.NewReader(tcpConn)); err != nil || r == nil {
-		// if there got broken pipe, http.ReadResponse will get a nil
-		return
-	} else {
-		r.URL.Scheme = "http"
-		s.handleHttp(conn.NewConn(tcpConn), r)
-	}
-}
+//func (s *httpServer) Process(tcpConn *net.TCPConn) {
+//	if r, err := http.ReadRequest(bufio.NewReader(tcpConn)); err != nil || r == nil {
+//		// if there got broken pipe, http.ReadResponse will get a nil
+//		return
+//	} else {
+//		r.URL.Scheme = "http"
+//		s.handleHttp(conn.NewConn(tcpConn), r)
+//	}
+//}

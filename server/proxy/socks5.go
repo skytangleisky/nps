@@ -51,7 +51,7 @@ type Sock5ModeServer struct {
 	listener net.Listener
 }
 
-//req
+// req
 func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 	/*
 		The SOCKS request is formed as follows:
@@ -84,18 +84,23 @@ func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 	}
 }
 
-//reply
+// reply
 func (s *Sock5ModeServer) sendReply(c net.Conn, rep uint8) {
 	reply := []byte{
 		5,
 		rep,
 		0,
-		1,
 	}
 
 	localAddr := c.LocalAddr().String()
 	localHost, localPort, _ := net.SplitHostPort(localAddr)
 	ipBytes := net.ParseIP(localHost).To4()
+	if ipBytes != nil {
+		reply = append(reply, 1)
+	} else {
+		ipBytes = net.ParseIP(localHost).To16()
+		reply = append(reply, 4)
+	}
 	nPort, _ := strconv.Atoi(localPort)
 	reply = append(reply, ipBytes...)
 	portBytes := make([]byte, 2)
@@ -105,7 +110,7 @@ func (s *Sock5ModeServer) sendReply(c net.Conn, rep uint8) {
 	c.Write(reply)
 }
 
-//do conn
+// do conn
 func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 	addrType := make([]byte, 1)
 	c.Read(addrType)
@@ -146,7 +151,7 @@ func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 	return
 }
 
-//conn
+// conn
 func (s *Sock5ModeServer) handleConnect(c net.Conn) {
 	s.doConnect(c, connectMethod)
 }
@@ -159,11 +164,16 @@ func (s *Sock5ModeServer) sendUdpReply(writeConn net.Conn, c net.Conn, rep uint8
 		5,
 		rep,
 		0,
-		1,
 	}
 	localHost, localPort, _ := net.SplitHostPort(c.LocalAddr().String())
 	localHost = serverIp
 	ipBytes := net.ParseIP(localHost).To4()
+	if ipBytes != nil {
+		reply = append(reply, 1)
+	} else {
+		ipBytes = net.ParseIP(localHost).To16()
+		reply = append(reply, 4)
+	}
 	nPort, _ := strconv.Atoi(localPort)
 	reply = append(reply, ipBytes...)
 	portBytes := make([]byte, 2)
@@ -280,7 +290,7 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 	}
 }
 
-//new conn
+// new conn
 func (s *Sock5ModeServer) handleConn(c net.Conn) {
 	buf := make([]byte, 2)
 	if _, err := io.ReadFull(c, buf); err != nil {
@@ -317,7 +327,7 @@ func (s *Sock5ModeServer) handleConn(c net.Conn) {
 	s.handleRequest(c)
 }
 
-//socks5 auth
+// socks5 auth
 func (s *Sock5ModeServer) Auth(c net.Conn) error {
 	header := []byte{0, 0}
 	if _, err := io.ReadAtLeast(c, header, 2); err != nil {
@@ -367,8 +377,9 @@ func (s *Sock5ModeServer) Auth(c net.Conn) error {
 	}
 }
 
-//start
+// start
 func (s *Sock5ModeServer) Start() error {
+	logs.Error(s.task.ServerIp, strconv.Itoa(s.task.Port))
 	return conn.NewTcpListenerAndProcess(s.task.ServerIp+":"+strconv.Itoa(s.task.Port), func(c net.Conn) {
 		if err := s.CheckFlowAndConnNum(s.task.Client); err != nil {
 			logs.Warn("client id %d, task id %d, error %s, when socks5 connection", s.task.Client.Id, s.task.Id, err.Error())
@@ -381,7 +392,7 @@ func (s *Sock5ModeServer) Start() error {
 	}, &s.listener)
 }
 
-//new
+// new
 func NewSock5ModeServer(bridge NetBridge, task *file.Tunnel) *Sock5ModeServer {
 	s := new(Sock5ModeServer)
 	s.bridge = bridge
@@ -389,7 +400,7 @@ func NewSock5ModeServer(bridge NetBridge, task *file.Tunnel) *Sock5ModeServer {
 	return s
 }
 
-//close
+// close
 func (s *Sock5ModeServer) Close() error {
 	return s.listener.Close()
 }

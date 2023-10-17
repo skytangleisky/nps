@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/astaxie/beego/logs"
-	"github.com/xtaci/kcp-go"
+	"github.com/xtaci/kcp-go/v5"
 
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/config"
@@ -240,9 +241,27 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 			logs.Trace("successful connection with client ,address %s", udpTunnel.RemoteAddr().String())
 			//read link info from remote
 			//conn.Accept(nps_mux.NewMux(udpTunnel, s.bridgeConnType, s.disconnectTime), func(c net.Conn) {
-			//conn.Accept(listener, func(c net.Conn) {
 			//	go s.handleChan(c)
 			//})
+			session, _ := smux.Server(udpTunnel, nil)
+			for {
+				c, err := session.Accept()
+				if err != nil {
+					if strings.Contains(err.Error(), "use of closed network connection") {
+						break
+					}
+					if strings.Contains(err.Error(), "the mux has closed") {
+						break
+					}
+					logs.Warn(err)
+					continue
+				}
+				if c == nil {
+					logs.Warn("nil connection")
+					break
+				}
+				go s.handleChan(c)
+			}
 			break
 		}
 	}

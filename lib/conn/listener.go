@@ -1,11 +1,10 @@
 package conn
 
 import (
+	"github.com/astaxie/beego/logs"
+	"github.com/xtaci/kcp-go/v5"
 	"net"
 	"strings"
-
-	"github.com/astaxie/beego/logs"
-	"github.com/xtaci/kcp-go"
 )
 
 func NewTcpListenerAndProcess(addr string, f func(c net.Conn), listener *net.Listener) error {

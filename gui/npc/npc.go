@@ -22,7 +22,7 @@ import (
 
 func main() {
 	daemon.InitDaemon("npc", common.GetRunPath(), common.GetTmpPath())
-	logs.SetLogger("store")
+	logs.SetLogger(nil, "store")
 	application := app.New()
 	window := application.NewWindow("Npc " + version.VERSION)
 	window.SetContent(WidgetScreen())

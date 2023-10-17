@@ -16,7 +16,7 @@ import (
 	"ehang.io/nps/lib/file"
 	"ehang.io/nps/server/proxy"
 	"github.com/astaxie/beego/logs"
-	"github.com/xtaci/kcp-go"
+	"github.com/xtaci/kcp-go/v5"
 )
 
 var (

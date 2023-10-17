@@ -25,7 +25,7 @@ import (
 	"ehang.io/nps/lib/crypt"
 	"ehang.io/nps/lib/version"
 	"github.com/astaxie/beego/logs"
-	"github.com/xtaci/kcp-go"
+	"github.com/xtaci/kcp-go/v5"
 	"golang.org/x/net/proxy"
 )
 
@@ -274,6 +274,7 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 // http proxy connection
 func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	req, err := http.NewRequest("CONNECT", "http://"+remoteAddr, nil)
+	logs.Error(remoteAddr)
 	if err != nil {
 		return nil, err
 	}
