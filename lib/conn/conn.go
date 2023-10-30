@@ -69,17 +69,6 @@ func (s *Conn) GetHost() (method, address string, rb []byte, err error, r *http.
 	if err != nil {
 		return
 	}
-	if r.Method != "CONNECT" {
-		arr := strings.Split(string(rb), "\n")
-		array := strings.Split(arr[0], " ")
-		url, _ := url.Parse(array[1])
-		url.Scheme = ""
-		url.Host = ""
-		array[1] = url.String()
-		arr[0] = strings.Join(array, " ")
-		logs.Alert(strings.Join(arr, "\n"))
-		rb = []byte(strings.Join(arr, "\n"))
-	}
 	hostPortURL, err := url.Parse(r.Host)
 	if err != nil {
 		address = r.Host
