@@ -94,7 +94,14 @@ func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, 
 		if f != nil {
 			f()
 		}
-		conn.CopyWaitGroup(target, c.Conn, link.Crypt, link.Compress, client.Rate, flow, true, rb)
+		if localProxy {
+			if rb != nil {
+				target.Write(rb)
+			}
+			conn.CopyWaitGroup2(target, c.Conn, flow)
+		} else {
+			conn.CopyWaitGroup(target, c.Conn, link.Crypt, link.Compress, client.Rate, flow, true, rb)
+		}
 	}
 	return nil
 }

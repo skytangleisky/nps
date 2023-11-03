@@ -180,19 +180,26 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		logs.Notice("connect to target %s error %s", lk.Host, err)
 		return
 	}
-	connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-
 	//change the host and header and set proxy setting
 	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
 	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
-
-	err = r.Write(connClient)
-	if err != nil {
-		logs.Error(err)
-		return
+	if host.Target.LocalProxy {
+		err = r.Write(target)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
+		conn.CopyWaitGroup2(target, c.Conn, host.Flow)
+	} else {
+		connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+		err = r.Write(connClient)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
+		conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
 	}
-	conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
-	//conn.CopyWaitGroup(connClient, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)//错误用法
+
 }
 func (s *httpServer) handleHttp2(c *conn.Conn, r *http.Request) {
 	var (

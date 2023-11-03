@@ -405,6 +405,34 @@ func CopyWaitGroup(conn1, conn2 net.Conn, crypt bool, snappy bool, rate *rate.Ra
 	}
 }
 
+func CopyWaitGroup2(conn1, conn2 net.Conn, flow *file.Flow) {
+	//var in, out int64
+	//var wg sync.WaitGroup
+	//go func(in *int64) {
+	//	wg.Add(1)
+	//	*in, _ = common.CopyBuffer(connHandle, conn2)
+	//	connHandle.Close()
+	//	conn2.Close()
+	//	wg.Done()
+	//}(&in)
+	//out, _ = common.CopyBuffer(conn2, connHandle)
+	//connHandle.Close()
+	//conn2.Close()
+	//wg.Wait()
+	//if flow != nil {
+	//	flow.Add(in, out)
+	//}
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	err := goroutine.CopyConnsPool.Invoke(goroutine.NewConns(conn1, conn2, flow, wg))
+	wg.Wait()
+	conn1.Close()
+	conn2.Close()
+	if err != nil {
+		logs.Error(err)
+	}
+}
+
 // get crypt or snappy conn
 func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.Conn {
 	if cpt {
