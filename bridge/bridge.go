@@ -219,7 +219,9 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 
 func (s *Bridge) DelClient(id int) {
 	if v, ok := s.Client.Load(id); ok {
+		var remoteAddress net.Addr
 		if v.(*Client).signal != nil {
+			remoteAddress = v.(*Client).signal.Conn.RemoteAddr()
 			v.(*Client).signal.WriteClose()
 			v.(*Client).signal.Close()
 		}
@@ -236,7 +238,7 @@ func (s *Bridge) DelClient(id int) {
 			return true
 		})
 		if v.(*Client).signal != nil {
-			logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, v.(*Client).signal.Conn.RemoteAddr(), num)
+			logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, remoteAddress, num)
 		}
 	}
 }
