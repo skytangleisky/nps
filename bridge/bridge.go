@@ -235,7 +235,9 @@ func (s *Bridge) DelClient(id int) {
 			num++
 			return true
 		})
-		logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, v.(*Client).signal.Conn.RemoteAddr(), num)
+		if v.(*Client).signal != nil {
+			logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, v.(*Client).signal.Conn.RemoteAddr(), num)
+		}
 	}
 }
 
