@@ -268,7 +268,14 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 		//	v.(*Client).Version = vs
 		//}
 
-		s.DelClient(id) //将已经登录的用户注销
+		// 断开先前的连接
+		if v, ok := s.Client.Load(id); ok {
+			if v.(*Client).signal != nil {
+				v.(*Client).signal.WriteClose()
+				v.(*Client).signal.Close()
+			}
+		}
+
 		s.Client.Store(id, NewClient(nil, nil, c, vs))
 		var num int64 = 0
 		s.Client.Range(func(k, v interface{}) bool {
