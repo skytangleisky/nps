@@ -305,7 +305,7 @@ func CopyDir(srcPath string, destPath string) error {
 		}
 		if !f.IsDir() {
 			destNewPath := strings.Replace(path, srcPath, destPath, -1)
-			log.Println("copy file ::" + path + " to " + destNewPath)
+			log.Println("copy file " + path + " to " + destNewPath)
 			copyFile(path, destNewPath)
 			if !common.IsWindows() {
 				chMod(destNewPath, 0766)
