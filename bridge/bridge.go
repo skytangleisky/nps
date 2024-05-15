@@ -219,7 +219,9 @@ func (s *Bridge) cliProcess(c *conn.Conn) {
 
 func (s *Bridge) DelClient(id int) {
 	if v, ok := s.Client.Load(id); ok {
+		var remoteAddress net.Addr
 		if v.(*Client).signal != nil {
+			remoteAddress = v.(*Client).signal.Conn.RemoteAddr()
 			v.(*Client).signal.WriteClose()
 			v.(*Client).signal.Close()
 		}
@@ -235,7 +237,9 @@ func (s *Bridge) DelClient(id int) {
 			num++
 			return true
 		})
-		logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, v.(*Client).signal.Conn.RemoteAddr(), num)
+		if v.(*Client).signal != nil {
+			logs.Error("clientId %d disconnected, address:%s ,Total=%d", id, remoteAddress, num)
+		}
 	}
 }
 
@@ -264,7 +268,14 @@ func (s *Bridge) typeDeal(typeVal string, c *conn.Conn, id int, vs string) {
 		//	v.(*Client).Version = vs
 		//}
 
-		s.DelClient(id) //将已经登录的用户注销
+		// 断开先前的连接
+		if v, ok := s.Client.Load(id); ok {
+			if v.(*Client).signal != nil {
+				v.(*Client).signal.WriteClose()
+				v.(*Client).signal.Close()
+			}
+		}
+
 		s.Client.Store(id, NewClient(nil, nil, c, vs))
 		var num int64 = 0
 		s.Client.Range(func(k, v interface{}) bool {
