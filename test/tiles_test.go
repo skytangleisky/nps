@@ -27,7 +27,6 @@ func Test_tiles(t *testing.T) {
 			value = atomic.LoadInt64(&count)
 			log.Print(value)
 		}()
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		query := r.URL.Query()
 		z := query.Get("z")
 		y := query.Get("y")
@@ -85,8 +84,10 @@ func Test_tiles(t *testing.T) {
 	}
 	var handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Private-Network", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 
@@ -105,16 +106,19 @@ func Test_tiles(t *testing.T) {
 			rand.Seed(time.Now().UnixNano())
 			tileUrl = urls[rand.Intn(4)]
 			suffix = ".jpg"
+			w.Header().Set("Content-Type", "image/jpeg")
 			process(w, r, rootDir, tileUrl, suffix)
 		case "terrain.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
 			tileUrl = "https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.webp?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".webp"
+			w.Header().Set("Content-Type", "image/webp")
 			process(w, r, rootDir, tileUrl, suffix)
 		case "vector.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
 			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=101F9W9FEMRxs&access_token=pk.eyJ1Ijoic2hldmF3ZW4iLCJhIjoiY2lwZXN2OGlvMDAwMXR1bmh0aG5vbDFteiJ9.2fsD37adZ1hC2MUU-2xByA"
 			suffix = ".pbf"
+			w.Header().Set("Content-Type", "application/x-protobuf")
 			process(w, r, rootDir, tileUrl, suffix)
 		default:
 			w.WriteHeader(http.StatusBadRequest)

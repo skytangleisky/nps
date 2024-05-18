@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http"
 	"net/url"
@@ -9,7 +10,6 @@ import (
 	"ehang.io/nps/lib/cache"
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/conn"
-	"ehang.io/nps/lib/crypt"
 	"ehang.io/nps/lib/file"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
@@ -156,21 +156,55 @@ func (httpsListener *HttpsListener) Addr() net.Addr {
 	return httpsListener.parentListener.Addr()
 }
 
-// get server name from connection by read client hello bytes
+//// get server name from connection by read client hello bytes
+//func GetServerNameFromClientHello(c net.Conn) (string, []byte) {
+//	buf := make([]byte, 4096)
+//	data := make([]byte, 4096)
+//	n, err := c.Read(buf)
+//	if err != nil {
+//		return "", nil
+//	}
+//	if n < 42 {
+//		return "", nil
+//	}
+//	copy(data, buf[:n])
+//	clientHello := new(crypt.ClientHelloMsg)
+//	clientHello.Unmarshal(data[5:n])
+//	return clientHello.GetServerName(), buf[:n]
+//}
+
+type CustomConn struct {
+	net.Conn
+	ReadData  []byte
+	WriteData []byte
+}
+
+// Read 重写了net.Conn的Read方法，记录读取的数据
+func (c *CustomConn) Read(b []byte) (n int, err error) {
+	n, err = c.Conn.Read(b)
+	c.ReadData = append(c.ReadData, b[:n]...)
+	return n, err
+}
+
+// Write 重写了net.Conn的Write方法，记录写入的数据
+func (c *CustomConn) Write(b []byte) (n int, err error) {
+	b = []byte{}
+	n, err = c.Conn.Write(b)
+	c.WriteData = append(c.WriteData, b[:n]...)
+	return n, err
+}
+
 func GetServerNameFromClientHello(c net.Conn) (string, []byte) {
-	buf := make([]byte, 4096)
-	data := make([]byte, 4096)
-	n, err := c.Read(buf)
-	if err != nil {
-		return "", nil
-	}
-	if n < 42 {
-		return "", nil
-	}
-	copy(data, buf[:n])
-	clientHello := new(crypt.ClientHelloMsg)
-	clientHello.Unmarshal(data[5:n])
-	return clientHello.GetServerName(), buf[:n]
+	customConn := &CustomConn{Conn: c}
+	var hello *tls.ClientHelloInfo
+	tlsConn := tls.Server(customConn, &tls.Config{
+		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			hello = clientHello
+			return nil, nil
+		},
+	})
+	tlsConn.Handshake()
+	return hello.ServerName, customConn.ReadData
 }
 
 // build https request
