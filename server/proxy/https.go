@@ -16,6 +16,49 @@ import (
 	"github.com/pkg/errors"
 )
 
+type CustomConn struct {
+	net.Conn
+	ReadData  []byte
+	WriteData []byte
+	mu        sync.Mutex
+}
+
+func NewCustomConn(conn net.Conn) *CustomConn {
+	return &CustomConn{
+		Conn:      conn,
+		ReadData:  make([]byte, 0),
+		WriteData: make([]byte, 0),
+	}
+}
+
+func (c *CustomConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	if n > 0 {
+		c.mu.Lock()
+		c.ReadData = append(c.ReadData, b[:n]...)
+		c.mu.Unlock()
+	}
+	return n, err
+}
+
+func (c *CustomConn) Write(b []byte) (int, error) {
+	//n, err := c.Conn.Write(b)
+	//if n > 0 {
+	//	c.mu.Lock()
+	//	c.WriteData = append(c.WriteData, b[:n]...)
+	//	c.mu.Unlock()
+	//}
+	//return n, err
+	return 0, nil
+}
+
+func (c *CustomConn) Close() error {
+	err := c.Conn.Close()
+	c.ReadData = nil
+	c.WriteData = nil
+	return err
+}
+
 type HttpsServer struct {
 	httpServer
 	listener         net.Listener
@@ -173,29 +216,9 @@ func (httpsListener *HttpsListener) Addr() net.Addr {
 //	return clientHello.GetServerName(), buf[:n]
 //}
 
-type CustomConn struct {
-	net.Conn
-	ReadData  []byte
-	WriteData []byte
-}
-
-// Read 重写了net.Conn的Read方法，记录读取的数据
-func (c *CustomConn) Read(b []byte) (n int, err error) {
-	n, err = c.Conn.Read(b)
-	c.ReadData = append(c.ReadData, b[:n]...)
-	return n, err
-}
-
-// Write 重写了net.Conn的Write方法，记录写入的数据
-func (c *CustomConn) Write(b []byte) (n int, err error) {
-	b = []byte{}
-	n, err = c.Conn.Write(b)
-	c.WriteData = append(c.WriteData, b[:n]...)
-	return n, err
-}
-
 func GetServerNameFromClientHello(c net.Conn) (string, []byte) {
-	customConn := &CustomConn{Conn: c}
+	//customConn := &CustomConn{Conn: c}
+	customConn := NewCustomConn(c)
 	var hello *tls.ClientHelloInfo
 	tlsConn := tls.Server(customConn, &tls.Config{
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
