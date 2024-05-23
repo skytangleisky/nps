@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"crypto/tls"
+	"bufio"
 	"io"
 	"net"
 	"net/http"
@@ -73,23 +73,23 @@ func (s *httpServer) Start() error {
 		//tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(s.httpPort))
 		//tcpListener, err := net.ListenTCP("tcp", tcpAddr)
 		//if err != nil {
-		//	logs.Error(err)
+		// logs.Error(err)
 		//  os.Exit(0)
 		//} else {
-		//	go func() {
-		//		for {
-		//			tcpConn, err := tcpListener.AcceptTCP()
-		//			if err != nil {
-		//				logs.Error(err)
-		//				tcpConn.Close()
-		//			} else {
-		//				go func() {
-		//					s.Process(tcpConn)
-		//				}()
-		//			}
+		// go func() {
+		//    for {
+		//       tcpConn, err := tcpListener.AcceptTCP()
+		//       if err != nil {
+		//          logs.Error(err)
+		//          tcpConn.Close()
+		//       } else {
+		//          go func() {
+		//             s.Process(tcpConn)
+		//          }()
+		//       }
 		//
-		//		}
-		//	}()
+		//    }
+		// }()
 		//}
 
 	}
@@ -121,19 +121,6 @@ func (s *httpServer) Close() error {
 }
 
 func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
-	hijacker, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
-		return
-	}
-	c, _, err := hijacker.Hijack()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-	}
-	s.handleHttp(conn.NewConn(c), r)
-}
-
-func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 	var (
 		host       *file.Host
 		target     net.Conn
@@ -142,32 +129,18 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		//scheme     = r.URL.Scheme
 		lk         *conn.Link
 		targetAddr string
-		isReset    bool
 	)
-	defer func() {
-		if connClient != nil {
-			connClient.Close()
-		} else {
-			s.writeConnFail(c.Conn)
-		}
-		c.Close()
-	}()
-	//reset:
-	if isReset {
-		host.Client.AddConn()
-	}
 	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
 		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
 		return
 	}
+	defer host.Client.AddConn()
 	if err := s.CheckFlowAndConnNum(host.Client); err != nil {
 		logs.Warn("client id %d, host id %d, error %s, when https connection", host.Client.Id, host.Id, err.Error())
 		return
 	}
-	if !isReset {
-		defer host.Client.AddConn()
-	}
-	if err = s.auth(r, c, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+	if err = s.auth(r, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+		w.Write([]byte(common.UnauthorizedBytes))
 		logs.Warn("auth error", err, r.RemoteAddr)
 		return
 	}
@@ -181,206 +154,97 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request) {
 		return
 	}
 	//change the host and header and set proxy setting
-	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
-	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
-	if host.Target.LocalProxy {
-		err = r.Write(target)
+	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, r.RemoteAddr, s.addOrigin)
+	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, r.RemoteAddr, lk.Host)
+
+	hijacker, ok := w.(http.Hijacker)
+	if ok {
+		c, _, err := hijacker.Hijack()
 		if err != nil {
-			logs.Error(err)
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		conn.CopyWaitGroup2(target, c.Conn, host.Flow)
-	} else {
-		connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-		err = r.Write(connClient)
-		if err != nil {
-			logs.Error(err)
-			return
-		}
-		conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
-	}
-
-}
-func (s *httpServer) handleHttp2(c *conn.Conn, r *http.Request) {
-	var (
-		host       *file.Host
-		target     net.Conn
-		err        error
-		connClient io.ReadWriteCloser
-		//scheme     = r.URL.Scheme
-		lk         *conn.Link
-		targetAddr string
-		lenConn    *conn.LenConn
-		isReset    bool
-		wg         sync.WaitGroup
-	)
-	defer func() {
-		if connClient != nil {
-			connClient.Close()
-		} else {
-			s.writeConnFail(c.Conn)
-		}
-		c.Close()
-	}()
-	//reset:
-	if isReset {
-		host.Client.AddConn()
-	}
-	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
-		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
-		return
-	}
-	if err := s.CheckFlowAndConnNum(host.Client); err != nil {
-		logs.Warn("client id %d, host id %d, error %s, when https connection", host.Client.Id, host.Id, err.Error())
-		return
-	}
-	if !isReset {
-		defer host.Client.AddConn()
-	}
-	if err = s.auth(r, c, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
-		logs.Warn("auth error", err, r.RemoteAddr)
-		return
-	}
-	if targetAddr, err = host.Target.GetRandomTarget(); err != nil {
-		logs.Warn(err.Error())
-		return
-	}
-	lk = conn.NewLink("http", targetAddr, host.Client.Cnf.Crypt, host.Client.Cnf.Compress, r.RemoteAddr, host.Target.LocalProxy)
-	if target, err = s.bridge.SendLinkInfo(host.Client.Id, lk, nil); err != nil {
-		logs.Notice("connect to target %s error %s", lk.Host, err)
-		return
-	}
-	//change the host and header and set proxy setting
-	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
-	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
-	connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-
-	//read from inc-client
-	go func() {
-		wg.Add(1)
-		isReset = false
-		defer connClient.Close()
 		defer func() {
-			wg.Done()
-			if !isReset {
-				c.Close()
-			}
-		}()
-		for {
-			/*
-				if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
-					// if there got broken pipe, http.ReadResponse will get a nil
-					return
-				} else {
-					//if the cache is start and the response is in the extension,store the response to the cache list
-					if s.useCache && r.URL != nil && strings.Contains(r.URL.Path, ".") {
-						b, err := httputil.DumpResponse(resp, true)
-						if err != nil {
-							return
-						}
-						c.Write(b)
-						host.Flow.Add(0, int64(len(b)))
-						s.cache.Add(filepath.Join(host.Host, r.URL.Path), b)
-					} else {
-						lenConn := conn.NewLenConn(c)
-						if err := resp.Write(lenConn); err != nil {
-							logs.Error(err)
-							return
-						}
-						host.Flow.Add(0, int64(lenConn.Len))
-					}
-				}*/
-
-			len, err := common.CopyBuffer(c, connClient)
-			if err != nil {
-				c.Close()
-				return
+			if connClient != nil {
+				connClient.Close()
 			} else {
-				host.Flow.Add(len, 0)
-				logs.Error("----------", len)
+				s.writeConnFail(c)
 			}
+			c.Close()
+		}()
+		if host.Target.LocalProxy {
+			err = r.Write(target)
+			if err != nil {
+				logs.Error(err)
+				return
+			}
+			conn.CopyWaitGroup2(target, c, host.Flow)
+		} else {
+			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			err = r.Write(connClient)
+			if err != nil {
+				logs.Error(err)
+				return
+			}
+			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, nil)
 		}
-	}()
-
-	//write
-	lenConn = conn.NewLenConn(connClient)
-
-	if err := r.Write(lenConn); err != nil {
-		logs.Error(err)
+	} else {
+		ctx := r.Context()
+		go func() {
+			<-ctx.Done()
+			target.Close()
+		}()
+		if host.Target.LocalProxy {
+			defer target.Close()
+			err = r.Write(target)
+			if err != nil {
+				logs.Error(err)
+				return
+			}
+			targetReader := bufio.NewReader(target)
+			resp, err := http.ReadResponse(targetReader, nil)
+			if err != nil {
+				logs.Error(err)
+				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
+				return
+			}
+			defer resp.Body.Close()
+			for k, v := range resp.Header {
+				for _, vv := range v {
+					w.Header().Add(k, vv)
+				}
+			}
+			w.WriteHeader(resp.StatusCode)
+			io.Copy(w, resp.Body)
+		} else {
+			defer target.Close()
+			connClient := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			defer connClient.Close()
+			err = r.Write(connClient)
+			if err != nil {
+				logs.Error(err)
+				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
+				return
+			}
+			connClient2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			defer connClient2.Close()
+			targetReader := bufio.NewReader(connClient2)
+			resp, err := http.ReadResponse(targetReader, nil)
+			if err != nil {
+				logs.Error(err)
+				return
+			}
+			defer resp.Body.Close()
+			for k, v := range resp.Header {
+				for _, vv := range v {
+					w.Header().Add(k, vv)
+				}
+			}
+			w.WriteHeader(resp.StatusCode)
+			io.Copy(w, resp.Body)
+		}
 	}
-	_, err = common.CopyBuffer(connClient, c)
-	if err != nil {
-		c.Close()
-		connClient.Close()
-		return
-	}
 
-	//for {
-	//	//if the cache start and the request is in the cache list, return the cache
-	//	if s.useCache {
-	//		if v, ok := s.cache.Get(filepath.Join(host.Host, r.URL.Path)); ok {
-	//			n, err := c.Write(v.([]byte))
-	//			if err != nil {
-	//				break
-	//			}
-	//			logs.Trace("%s request, method %s, host %s, url %s, remote address %s, return cache", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String())
-	//			host.Flow.Add(0, int64(n))
-	//			//if return cache and does not create a new conn with client and Connection is not set or close, close the connection.
-	//			if strings.ToLower(r.Header.Get("Connection")) == "close" || strings.ToLower(r.Header.Get("Connection")) == "" {
-	//				break
-	//			}
-	//			goto readReq
-	//		}
-	//	}
-	//
-	//	//change the host and header and set proxy setting
-	//	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
-	//	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
-	//	//write
-	//	lenConn = conn.NewLenConn(connClient)
-	//	if err := r.Write(lenConn); err != nil {
-	//		logs.Error(err)
-	//		break
-	//	}
-	//	host.Flow.Add(int64(lenConn.Len), 0)
-	//
-	//readReq:
-	//
-	//	_,err=common.CopyBuffer(target,c)
-	//	if err!=nil{
-	//		target.Close()
-	//		break
-	//	}
-	//
-	//	//read req from connection
-	//	if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
-	//		break
-	//	}
-	//	r.URL.Scheme = scheme
-	//	//What happened ，Why one character less???
-	//	r.Method = resetReqMethod(r.Method)
-	//	if hostTmp, err := file.GetDb().GetInfoByHost(r.Host, r); err != nil {
-	//		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
-	//		break
-	//	} else if host != hostTmp {
-	//		host = hostTmp
-	//		isReset = true
-	//		connClient.Close()
-	//		goto reset
-	//	}
-	//
-	//}
-	wg.Wait()
-}
-
-func resetReqMethod(method string) string {
-	if method == "ET" {
-		return "GET"
-	}
-	if method == "OST" {
-		return "POST"
-	}
-	return method
 }
 
 func (s *httpServer) NewServer(port int, scheme string) *http.Server {
@@ -391,16 +255,6 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 			s.handleTunneling(w, r)
 		}),
 		// Disable HTTP/2.
-		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
 }
-
-//func (s *httpServer) Process(tcpConn *net.TCPConn) {
-//	if r, err := http.ReadRequest(bufio.NewReader(tcpConn)); err != nil || r == nil {
-//		// if there got broken pipe, http.ReadResponse will get a nil
-//		return
-//	} else {
-//		r.URL.Scheme = "http"
-//		s.handleHttp(conn.NewConn(tcpConn), r)
-//	}
-//}

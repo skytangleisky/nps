@@ -159,7 +159,9 @@ func (https *HttpsServer) handleHttps(c net.Conn) {
 		return
 	}
 	defer host.Client.AddConn()
-	if err = https.auth(r, conn.NewConn(c), host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+	if err = https.auth(r, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+		c.Write([]byte(common.UnauthorizedBytes))
+		c.Close()
 		logs.Warn("auth error", err, r.RemoteAddr)
 		return
 	}
@@ -227,6 +229,9 @@ func GetServerNameFromClientHello(c net.Conn) (string, []byte) {
 		},
 	})
 	tlsConn.Handshake()
+	if hello == nil {
+		return "", nil
+	}
 	return hello.ServerName, customConn.ReadData
 }
 

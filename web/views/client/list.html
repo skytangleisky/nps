@@ -42,7 +42,6 @@
     $('#table').bootstrapTable({
         toolbar: "#toolbar",
         method: 'post', // 服务器数据的请求方式 get or post
-        url: "{{.web_base_url}}/client/list", // 服务器数据的加载地址
         contentType: "application/x-www-form-urlencoded",
         striped: true, // 设置为true会有隔行变色效果
         search: true,
@@ -208,5 +207,8 @@
                 }
             }
         ]
+    });
+    window.addEventListener('pageshow', function() {
+        $('#table').bootstrapTable('refresh', { url: "{{.web_base_url}}/client/list"});
     });
 </script>

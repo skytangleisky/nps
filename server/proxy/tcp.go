@@ -118,7 +118,9 @@ func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
 		c.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
 		rb = nil
 	}
-	if err := s.auth(r, c, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
+	if err := s.auth(r, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
+		c.Write([]byte(common.UnauthorizedBytes))
+		c.Close()
 		return err
 	}
 	return s.DealClient(c, s.task.Client, addr, rb, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)

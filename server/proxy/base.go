@@ -63,10 +63,8 @@ func (s *BaseServer) writeConnFail(c net.Conn) {
 }
 
 // auth check
-func (s *BaseServer) auth(r *http.Request, c net.Conn, u, p string) error {
+func (s *BaseServer) auth(r *http.Request, u, p string) error {
 	if u != "" && p != "" && !common.CheckAuth(r, u, p) {
-		c.Write([]byte(common.UnauthorizedBytes))
-		c.Close()
 		return errors.New("401 Unauthorized")
 	}
 	return nil
