@@ -14,8 +14,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil/v3 v3.21.3
 	github.com/xtaci/kcp-go/v5 v5.6.1
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
-	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57
+	golang.org/x/net v0.25.0
+	golang.org/x/sys v0.20.0
 )
 
 require (
@@ -25,9 +25,10 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
 	github.com/klauspost/pgzip v1.2.1 // indirect
 	github.com/klauspost/reedsolomon v1.9.12 // indirect
+	github.com/miekg/dns v1.1.59 // indirect
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/tjfoc/gmsm v1.4.0 // indirect
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
+	golang.org/x/tools v0.21.0 // indirect
 )
 
 replace github.com/astaxie/beego => github.com/exfly/beego v1.12.0-export-init
