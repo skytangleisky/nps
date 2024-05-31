@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"golang.org/x/net/proxy"
 	"io/ioutil"
 	"log"
 	"math"
@@ -26,7 +27,6 @@ import (
 	"ehang.io/nps/lib/version"
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go/v5"
-	"golang.org/x/net/proxy"
 )
 
 func GetTaskStatus(path string) {

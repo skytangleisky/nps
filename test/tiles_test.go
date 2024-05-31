@@ -103,8 +103,8 @@ func Test_tiles(t *testing.T) {
 				"https://mt2.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
 				"https://mt3.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
 			}
-			rand.Seed(time.Now().UnixNano())
-			tileUrl = urls[rand.Intn(4)]
+			rd := rand.New(rand.NewSource(time.Now().UnixNano()))
+			tileUrl = urls[rd.Intn(4)]
 			suffix = ".jpg"
 			w.Header().Set("Content-Type", "image/jpeg")
 			process(w, r, rootDir, tileUrl, suffix)
@@ -116,7 +116,7 @@ func Test_tiles(t *testing.T) {
 			process(w, r, rootDir, tileUrl, suffix)
 		case "vector.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
-			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=101F9W9FEMRxs&access_token=pk.eyJ1Ijoic2hldmF3ZW4iLCJhIjoiY2lwZXN2OGlvMDAwMXR1bmh0aG5vbDFteiJ9.2fsD37adZ1hC2MUU-2xByA"
+			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".pbf"
 			w.Header().Set("Content-Type", "application/x-protobuf")
 			process(w, r, rootDir, tileUrl, suffix)
@@ -128,5 +128,5 @@ func Test_tiles(t *testing.T) {
 		http.ListenAndServeTLS(":3240", "../conf/tanglei.site.pem", "../conf/tanglei.site.key", handler)
 	}()
 	http.ListenAndServe(":3241", h2c.NewHandler(handler, &http2.Server{}))
-	//http.ListenAndServe(":3211", handler)
+	//http.ListenAndServe(":3241", handler)
 }

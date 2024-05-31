@@ -25,7 +25,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
 	github.com/klauspost/pgzip v1.2.1 // indirect
 	github.com/klauspost/reedsolomon v1.9.12 // indirect
-	github.com/miekg/dns v1.1.59 // indirect
+	github.com/miekg/dns v1.1.59
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/tjfoc/gmsm v1.4.0 // indirect
 	golang.org/x/tools v0.21.0 // indirect
