@@ -82,24 +82,45 @@ func (s *BaseServer) CheckFlowAndConnNum(client *file.Client) error {
 }
 
 // create a new connection and start bytes copying
-func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, rb []byte, tp string, f func(), flow *file.Flow, localProxy bool) error {
+func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, rb []byte, tp string, f func(addr string), flow *file.Flow, localProxy bool) error {
 	link := conn.NewLink(tp, addr, client.Cnf.Crypt, client.Cnf.Compress, c.Conn.RemoteAddr().String(), localProxy)
 	if target, err := s.bridge.SendLinkInfo(client.Id, link, s.task); err != nil {
 		logs.Warn("get connection from client id %d  error %s", client.Id, err.Error())
 		c.Close()
 		return err
 	} else {
+		//if localProxy {
+		//	buffer := make([]byte, 1024)
+		//	n, err := target.Read(buffer)
+		//	if err != nil {
+		//		c.Close()
+		//		return err
+		//	}
+		//	addr := buffer[:n]
+		//	if f != nil {
+		//		f(string(addr))
+		//	}
+		//	if rb != nil {
+		//		target.Write(rb)
+		//	}
+		//	conn.CopyWaitGroup2(target, c.Conn, flow)
+		//} else {
+		buffer := make([]byte, 1024)
+		connHandle := conn.GetConn(target, link.Crypt, link.Compress, client.Rate, true)
+		n, err := connHandle.Read(buffer)
+		if err != nil {
+			c.Close()
+			return err
+		}
+		addr := buffer[:n]
 		if f != nil {
-			f()
+			f(string(addr))
 		}
-		if localProxy {
-			if rb != nil {
-				target.Write(rb)
-			}
-			conn.CopyWaitGroup2(target, c.Conn, flow)
-		} else {
-			conn.CopyWaitGroup(target, c.Conn, link.Crypt, link.Compress, client.Rate, flow, true, rb)
+		if rb != nil {
+			connHandle.Write(rb)
 		}
+		conn.CopyWaitGroup2(connHandle, c.Conn, flow)
+		//}
 	}
 	return nil
 }

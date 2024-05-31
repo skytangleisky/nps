@@ -79,34 +79,36 @@ func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 	case associateMethod:
 		s.handleUDP(c)
 	default:
-		s.sendReply(c, commandNotSupported)
+		s.sendReply(c, "", commandNotSupported)
 		c.Close()
 	}
 }
 
 // reply
-func (s *Sock5ModeServer) sendReply(c net.Conn, rep uint8) {
+func (s *Sock5ModeServer) sendReply(c net.Conn, addr string, rep uint8) {
 	reply := []byte{
 		5,
 		rep,
 		0,
 	}
-
-	localAddr := c.LocalAddr().String()
-	localHost, localPort, _ := net.SplitHostPort(localAddr)
-	ipBytes := net.ParseIP(localHost).To4()
-	if ipBytes != nil {
-		reply = append(reply, 1)
+	if addr != "" {
+		logs.Alert("====>", addr)
+		host, port, _ := net.SplitHostPort(addr)
+		ipBytes := net.ParseIP(host).To4()
+		if ipBytes != nil {
+			reply = append(reply, 1)
+		} else {
+			ipBytes = net.ParseIP(host).To16()
+			reply = append(reply, 4)
+		}
+		nPort, _ := strconv.Atoi(port)
+		reply = append(reply, ipBytes...)
+		portBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBytes, uint16(nPort))
+		reply = append(reply, portBytes...)
 	} else {
-		ipBytes = net.ParseIP(localHost).To16()
-		reply = append(reply, 4)
+		reply[1] = networkUnreachable
 	}
-	nPort, _ := strconv.Atoi(localPort)
-	reply = append(reply, ipBytes...)
-	portBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(portBytes, uint16(nPort))
-	reply = append(reply, portBytes...)
-
 	c.Write(reply)
 }
 
@@ -131,7 +133,7 @@ func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 		c.Read(domain)
 		host = string(domain)
 	default:
-		s.sendReply(c, addrTypeNotSupported)
+		s.sendReply(c, "", addrTypeNotSupported)
 		return
 	}
 
@@ -145,8 +147,8 @@ func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 	} else {
 		ltype = common.CONN_TCP
 	}
-	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, ltype, func() {
-		s.sendReply(c, succeeded)
+	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, ltype, func(addr string) {
+		s.sendReply(c, addr, succeeded)
 	}, s.task.Flow, s.task.Target.LocalProxy)
 	return
 }
@@ -204,7 +206,7 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 		c.Read(domain)
 		host = string(domain)
 	default:
-		s.sendReply(c, addrTypeNotSupported)
+		s.sendReply(c, "", addrTypeNotSupported)
 		return
 	}
 	//读取端口
@@ -218,7 +220,7 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 	}
 	reply, err := net.ListenUDP("udp", replyAddr)
 	if err != nil {
-		s.sendReply(c, addrTypeNotSupported)
+		s.sendReply(c, "", addrTypeNotSupported)
 		logs.Error("listen local reply udp port error")
 		return
 	}
