@@ -1,16 +1,15 @@
 package proxy
 
 import (
-	"encoding/binary"
-	"errors"
-	"io"
-	"net"
-	"strconv"
-
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/conn"
 	"ehang.io/nps/lib/file"
+	"encoding/binary"
+	"errors"
 	"github.com/astaxie/beego/logs"
+	"io"
+	"net"
+	"strconv"
 )
 
 const (
@@ -86,11 +85,7 @@ func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 
 // reply
 func (s *Sock5ModeServer) sendReply(c net.Conn, addr string, rep uint8) {
-	reply := []byte{
-		5,
-		rep,
-		0,
-	}
+	reply := []byte{5, rep, 0}
 	if addr != "" {
 		logs.Alert("====>", addr)
 		host, port, _ := net.SplitHostPort(addr)
@@ -158,15 +153,48 @@ func (s *Sock5ModeServer) handleConnect(c net.Conn) {
 	s.doConnect(c, connectMethod)
 }
 
-// passive mode
+// 对bind支持的alpha版本，市面上使用极少（像新版ftp客户端,filezilla,curl等均不支持bind指令,包括下面的命令也不支持）
+// curl -u 2413081441@qq.com:Tanglei201314 ftp://192.168.101.104:21/ --socks5 socks5://tanglei.site:5555 --ftp-port :1234 (实际并没有发送bind指令)
 func (s *Sock5ModeServer) handleBind(c net.Conn) {
+	reply := []byte{5, 7, 0}
+	buffer := make([]byte, 1)
+	_, err := c.Read(buffer)
+	if err != nil {
+		reply[1] = serverFailure
+		c.Write(reply)
+		return
+	}
+	addrType := buffer[0]
+	var host string
+	switch addrType {
+	case ipV4:
+		ipv4 := make(net.IP, net.IPv4len)
+		c.Read(ipv4)
+		host = ipv4.String()
+	case ipV6:
+		ipv6 := make(net.IP, net.IPv6len)
+		c.Read(ipv6)
+		host = ipv6.String()
+	case domainName:
+		var domainLen uint8
+		binary.Read(c, binary.BigEndian, &domainLen)
+		domain := make([]byte, domainLen)
+		c.Read(domain)
+		host = string(domain)
+	default:
+		reply[1] = addrTypeNotSupported
+		c.Write(reply)
+		return
+	}
+	var port uint16
+	binary.Read(c, binary.BigEndian, &port)
+	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
+	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, common.CONN_BIND, func(addr string) {
+		s.sendReply(c, addr, succeeded)
+	}, s.task.Flow, s.task.Target.LocalProxy)
 }
 func (s *Sock5ModeServer) sendUdpReply(writeConn net.Conn, c net.Conn, rep uint8, serverIp string) {
-	reply := []byte{
-		5,
-		rep,
-		0,
-	}
+	reply := []byte{5, rep, 0}
 	localHost, localPort, _ := net.SplitHostPort(c.LocalAddr().String())
 	localHost = serverIp
 	ipBytes := net.ParseIP(localHost).To4()

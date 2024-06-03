@@ -24,6 +24,7 @@ const (
 	NEW_TASK          = "task"
 	NEW_CONF          = "conf"
 	NEW_HOST          = "host"
+	CONN_BIND         = "bind"
 	CONN_TCP          = "tcp"
 	CONN_UDP          = "udp"
 	CONN_TEST         = "TST"

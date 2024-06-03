@@ -60,7 +60,7 @@ func handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 						Class:  dns.ClassINET,
 						Ttl:    600,
 					},
-					AAAA: net.ParseIP("240e:39e:3c3:47e0:69d:8986:7689:7eb4"),
+					AAAA: net.ParseIP("240e:39e:3c1:7ea0:a110:649:ab14:dedf"),
 				}
 				msg.Answer = append(msg.Answer, a)
 			} else if q.Qtype == dns.TypeHTTPS {

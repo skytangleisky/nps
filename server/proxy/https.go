@@ -65,9 +65,10 @@ type HttpsServer struct {
 	httpsListenerMap sync.Map
 }
 
-func NewHttpsServer(l net.Listener, bridge NetBridge, useCache bool, cacheLen int) *HttpsServer {
+func NewHttpsServer(l net.Listener, bridge NetBridge, useCache bool, cacheLen int, addOrigin bool) *HttpsServer {
 	https := &HttpsServer{listener: l}
 	https.bridge = bridge
+	https.addOrigin = addOrigin
 	if useCache {
 		https.cache = cache.New(cacheLen)
 	}

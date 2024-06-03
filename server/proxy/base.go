@@ -26,6 +26,7 @@ type NetBridge interface {
 type BaseServer struct {
 	id           int
 	bridge       NetBridge
+	addOrigin    bool
 	task         *file.Tunnel
 	errorContent []byte
 	sync.Mutex

@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"ehang.io/nps/smux"
+	"encoding/binary"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -334,19 +336,57 @@ func (s *TRPClient) handleChan(src net.Conn) {
 			//srcConn.Close()
 			//targetConn.Close()
 		}
-		return
-	}
-	if lk.ConnType == "udp5" {
+	} else if lk.ConnType == "udp5" {
 		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
 		s.handleUdp(src)
-	}
-	//connect to target if conn type is tcp or udp
-	if targetConn, err := net.DialTimeout(lk.ConnType, lk.Host, lk.Option.Timeout); err != nil {
-		logs.Warn("connect to %s error %s", lk.Host, err.Error())
-		src.Close()
+	} else if lk.ConnType == common.CONN_BIND {
+		actualBindAddr := src.LocalAddr().(*net.TCPAddr)
+		actualHost, _, err := net.SplitHostPort(actualBindAddr.String())
+		if err != nil {
+			_ = src.Close()
+			return
+		}
+		bindLn, err := net.Listen("tcp", net.JoinHostPort(actualHost, "0"))
+		if err != nil {
+			fmt.Println("Error binding to address:", err.Error())
+			_ = src.Close()
+			return
+		}
+		logs.Alert(actualHost, bindLn.Addr().(*net.TCPAddr).Port)
+		reply := []byte{5, 0, 0}
+		ipBytes := actualBindAddr.IP.To4()
+		if ipBytes != nil {
+			reply = append(reply, 1)
+		} else {
+			reply = append(reply, 4)
+			ipBytes = actualBindAddr.IP.To16()
+		}
+		reply = append(reply, ipBytes...)
+		portBuf := make([]byte, 2)
+		binary.BigEndian.PutUint16(portBuf, uint16(bindLn.Addr().(*net.TCPAddr).Port))
+		reply = append(reply, portBuf...)
+
+		srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
+		srcConn.Write([]byte(net.JoinHostPort(actualHost, string(strconv.Itoa(bindLn.Addr().(*net.TCPAddr).Port)))))
+
+		bindConn, err := bindLn.Accept()
+		if err != nil {
+			srcConn.Close()
+			fmt.Println("Error accepting bind connection:", err.Error())
+		} else {
+			bindLn.Close()
+			conn.CopyWaitGroup2(srcConn, bindConn, nil)
+		}
+		logs.Alert("END·················")
 	} else {
-		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
-		conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, []byte(targetConn.LocalAddr().String()))
+		//connect to target if conn type is tcp or udp
+		if targetConn, err := net.DialTimeout(lk.ConnType, lk.Host, lk.Option.Timeout); err != nil {
+			logs.Warn("connect to %s error %s", lk.Host, err.Error())
+			src.Close()
+		} else {
+			logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
+			conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, []byte(targetConn.LocalAddr().String()))
+		}
 	}
 }
 
