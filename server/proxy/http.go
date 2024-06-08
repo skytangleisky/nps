@@ -205,6 +205,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			resp, err := http.ReadResponse(targetReader, nil)
 			if err != nil {
 				logs.Error(err)
+				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
 				return
 			}
@@ -223,6 +224,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			err = r.Write(connClient)
 			if err != nil {
 				logs.Error(err)
+				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
 				return
 			}
