@@ -116,7 +116,7 @@ func Test_tiles(t *testing.T) {
 			process(w, r, rootDir, tileUrl, suffix)
 		case "vector.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
-			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
+			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".pbf"
 			w.Header().Set("Content-Type", "application/x-protobuf")
 			process(w, r, rootDir, tileUrl, suffix)
