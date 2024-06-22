@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -151,6 +152,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 	lk = conn.NewLink("http", targetAddr, host.Client.Cnf.Crypt, host.Client.Cnf.Compress, r.RemoteAddr, host.Target.LocalProxy)
 	if target, err = s.bridge.SendLinkInfo(host.Client.Id, lk, nil); err != nil {
 		logs.Notice("connect to target %s error %s", lk.Host, err)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		http.Error(w, fmt.Sprintf("connect to target %s error, the client is not connect.", lk.Host), http.StatusOK)
 		return
 	}
 	//change the host and header and set proxy setting
@@ -206,7 +209,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				logs.Error(err)
 				w.Header().Set("Access-Control-Allow-Origin", "*")
-				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
+				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
 				return
 			}
 			defer resp.Body.Close()
@@ -225,7 +228,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				logs.Error(err)
 				w.Header().Set("Access-Control-Allow-Origin", "*")
-				http.Error(w, "Failed to read response from target server", http.StatusBadGateway)
+				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
 				return
 			}
 			connClient2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
