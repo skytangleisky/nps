@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -219,7 +218,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
+			//io.Copy(w, resp.Body)
+			common.CopyBuffer(w, resp.Body)
 		} else {
 			defer target.Close()
 			connClient := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
@@ -246,7 +246,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
+			common.CopyBuffer(w, resp.Body)
+			//io.Copy(w, resp.Body)
 		}
 	}
 
