@@ -451,8 +451,8 @@ func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.
 		if snappy { // 不加密压缩
 			return rate.NewRateConn(NewSnappyConn(conn), rt)
 		} else { // 不加密不压缩
-			//return rate.NewRateConn(conn, rt)
-			return conn
+			return rate.NewRateConn(conn, rt)
+			//return conn
 		}
 	}
 }

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"ehang.io/nps/lib/rate"
 	"fmt"
 	"net"
 	"net/http"
@@ -197,13 +198,14 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			target.Close()
 		}()
 		if host.Target.LocalProxy {
-			defer target.Close()
-			err = r.Write(target)
+			targetConn := rate.NewRateConn(target, host.Client.Rate)
+			defer targetConn.Close()
+			err = r.Write(targetConn)
 			if err != nil {
 				logs.Error(err)
 				return
 			}
-			targetReader := bufio.NewReader(target)
+			targetReader := bufio.NewReader(targetConn)
 			resp, err := http.ReadResponse(targetReader, nil)
 			if err != nil {
 				logs.Error(err)
@@ -222,18 +224,18 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			common.CopyBuffer(w, resp.Body)
 		} else {
 			defer target.Close()
-			connClient := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			defer connClient.Close()
-			err = r.Write(connClient)
+			targetConn := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			defer targetConn.Close()
+			err = r.Write(targetConn)
 			if err != nil {
 				logs.Error(err)
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
 				return
 			}
-			connClient2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			defer connClient2.Close()
-			targetReader := bufio.NewReader(connClient2)
+			targetConn2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			defer targetConn2.Close()
+			targetReader := bufio.NewReader(targetConn2)
 			resp, err := http.ReadResponse(targetReader, nil)
 			if err != nil {
 				logs.Error(err)
