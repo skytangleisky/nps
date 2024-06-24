@@ -3,7 +3,6 @@ package controllers
 import (
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/file"
-	"ehang.io/nps/lib/rate"
 	"ehang.io/nps/server"
 	"github.com/astaxie/beego"
 )
@@ -133,10 +132,10 @@ func (s *ClientController) Edit() {
 			}
 			c.WebPassword = s.getEscapeString("web_password")
 			c.ConfigConnAllow = s.GetBoolNoErr("config_conn_allow")
-			if c.Rate != nil {
-				c.Rate.Stop()
-			}
-			c.Rate = rate.NewRate(int64(c.RateLimit * 1024))
+			//if c.Rate != nil {
+			//	c.Rate.Stop()
+			//}
+			c.Rate.SetRate(int64(c.RateLimit * 1024))
 			file.GetDb().JsonDb.StoreClientsToJsonFile()
 		}
 		s.AjaxOk("save success")

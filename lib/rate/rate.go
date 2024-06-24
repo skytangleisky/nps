@@ -30,10 +30,11 @@ func NewRate(size int64) *Rate {
 func (s *Rate) Stop() {
 	s.stopChan <- true
 }
-
+func (s *Rate) SetRate(size int64) {
+	s.bucketSize = size
+	s.bucketSurplusSize = s.bucketSize
+}
 func (s *Rate) Get(size int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.bucketSize > 0 {
 		if s.bucketSurplusSize >= size {
 			atomic.AddInt64(&s.bucketSurplusSize, -size)
@@ -49,6 +50,9 @@ func (s *Rate) Get(size int64) {
 						ticker.Stop()
 						return
 					}
+				case <-s.stopChan:
+					ticker.Stop()
+					return
 				}
 			}
 		}
@@ -62,11 +66,9 @@ func (s *Rate) session() {
 	for {
 		select {
 		case <-ticker.C:
-			s.mu.Lock()
 			s.NowRate = s.count
 			s.count = 0
 			s.bucketSurplusSize = s.bucketSize
-			s.mu.Unlock()
 		case <-s.stopChan:
 			ticker.Stop()
 			return
