@@ -60,12 +60,7 @@ func (s *JsonDb) LoadClientFromJsonFile() {
 		if json.Unmarshal([]byte(v), &post) != nil {
 			return
 		}
-		if post.RateLimit > 0 {
-			post.Rate = rate.NewRate(int64(post.RateLimit * 1024))
-		} else {
-			post.Rate = rate.NewRate(int64(2 << 23))
-		}
-		post.Rate.Start()
+		post.Rate = rate.NewRate(int64(post.RateLimit * 1024))
 		post.NowConn = 0
 		s.Clients.Store(post.Id, post)
 		if post.Id > int(s.ClientIncreaseId) {

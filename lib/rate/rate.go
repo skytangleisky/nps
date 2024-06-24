@@ -1,78 +1,72 @@
 package rate
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
 type Rate struct {
+	count             int64
 	bucketSize        int64
 	bucketSurplusSize int64
-	bucketAddSize     int64
+	mu                sync.Mutex
 	stopChan          chan bool
 	NowRate           int64
 }
 
-func NewRate(addSize int64) *Rate {
-	return &Rate{
-		bucketSize:        addSize * 2,
+func NewRate(size int64) *Rate {
+	s := &Rate{
+		count:             0,
+		bucketSize:        size,
 		bucketSurplusSize: 0,
-		bucketAddSize:     addSize,
 		stopChan:          make(chan bool),
 	}
-}
-
-func (s *Rate) Start() {
 	go s.session()
+	return s
 }
 
-func (s *Rate) add(size int64) {
-	if res := s.bucketSize - s.bucketSurplusSize; res < s.bucketAddSize {
-		atomic.AddInt64(&s.bucketSurplusSize, res)
-		return
-	}
-	atomic.AddInt64(&s.bucketSurplusSize, size)
-}
-
-//回桶
-func (s *Rate) ReturnBucket(size int64) {
-	s.add(size)
-}
-
-//停止
+// 停止
 func (s *Rate) Stop() {
 	s.stopChan <- true
 }
 
 func (s *Rate) Get(size int64) {
-	if s.bucketSurplusSize >= size {
-		atomic.AddInt64(&s.bucketSurplusSize, -size)
-		return
-	}
-	ticker := time.NewTicker(time.Millisecond * 100)
-	for {
-		select {
-		case <-ticker.C:
-			if s.bucketSurplusSize >= size {
-				atomic.AddInt64(&s.bucketSurplusSize, -size)
-				ticker.Stop()
-				return
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.bucketSize > 0 {
+		if s.bucketSurplusSize >= size {
+			atomic.AddInt64(&s.bucketSurplusSize, -size)
+			s.count += size
+		} else {
+			ticker := time.NewTicker(time.Millisecond * 100)
+			for {
+				select {
+				case <-ticker.C:
+					if s.bucketSurplusSize >= size {
+						atomic.AddInt64(&s.bucketSurplusSize, -size)
+						s.count += size
+						ticker.Stop()
+						return
+					}
+				}
 			}
 		}
+	} else {
+		s.count += size
 	}
 }
 
 func (s *Rate) session() {
-	ticker := time.NewTicker(time.Second * 1)
+	ticker := time.NewTicker(time.Second)
 	for {
 		select {
 		case <-ticker.C:
-			if rs := s.bucketAddSize - s.bucketSurplusSize; rs > 0 {
-				s.NowRate = rs
-			} else {
-				s.NowRate = s.bucketSize - s.bucketSurplusSize
-			}
-			s.add(s.bucketAddSize)
+			s.mu.Lock()
+			s.NowRate = s.count
+			s.count = 0
+			s.bucketSurplusSize = s.bucketSize
+			s.mu.Unlock()
 		case <-s.stopChan:
 			ticker.Stop()
 			return

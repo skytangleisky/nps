@@ -213,12 +213,7 @@ reset:
 		isNotSet = true
 		c.VerifyKey = crypt.GetRandomString(16)
 	}
-	if c.RateLimit == 0 {
-		c.Rate = rate.NewRate(int64(2 << 23))
-	} else if c.Rate == nil {
-		c.Rate = rate.NewRate(int64(c.RateLimit * 1024))
-	}
-	c.Rate.Start()
+	c.Rate = rate.NewRate(int64(c.RateLimit * 1024))
 	if !s.VerifyVkey(c.VerifyKey, c.Id) {
 		if isNotSet {
 			goto reset
@@ -264,10 +259,7 @@ func (s *DbUtils) VerifyUserName(username string, id int) (res bool) {
 
 func (s *DbUtils) UpdateClient(t *Client) error {
 	s.JsonDb.Clients.Store(t.Id, t)
-	if t.RateLimit == 0 {
-		t.Rate = rate.NewRate(int64(2 << 23))
-		t.Rate.Start()
-	}
+	t.Rate = rate.NewRate(int64(t.RateLimit * 1024))
 	return nil
 }
 

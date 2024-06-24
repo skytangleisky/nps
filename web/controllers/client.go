@@ -136,13 +136,7 @@ func (s *ClientController) Edit() {
 			if c.Rate != nil {
 				c.Rate.Stop()
 			}
-			if c.RateLimit > 0 {
-				c.Rate = rate.NewRate(int64(c.RateLimit * 1024))
-				c.Rate.Start()
-			} else {
-				c.Rate = rate.NewRate(int64(2 << 23))
-				c.Rate.Start()
-			}
+			c.Rate = rate.NewRate(int64(c.RateLimit * 1024))
 			file.GetDb().JsonDb.StoreClientsToJsonFile()
 		}
 		s.AjaxOk("save success")
