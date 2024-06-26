@@ -153,7 +153,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 	if target, err = s.bridge.SendLinkInfo(host.Client.Id, lk, nil); err != nil {
 		logs.Notice("connect to target %s error %s", lk.Host, err)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		http.Error(w, fmt.Sprintf("connect to target %s error, the client is not connect.", lk.Host), http.StatusOK)
+		http.Error(w, fmt.Sprintf("connect to target %s error, the client is not connected.", lk.Host), http.StatusOK)
 		return
 	}
 	//change the host and header and set proxy setting

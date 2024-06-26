@@ -402,7 +402,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			return
 		}
 	} else {
-		err = errors.New(fmt.Sprintf("the client %d is not connect", clientId))
+		err = errors.New(fmt.Sprintf("the client %d is not connected", clientId))
 	}
 	return
 }
