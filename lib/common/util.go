@@ -314,8 +314,8 @@ func GetPortByAddr(addr string) int {
 }
 
 func CopyBuffer(dst io.Writer, src io.Reader, label ...string) (written int64, err error) {
-	buf := CopyBuff.Get()
-	defer CopyBuff.Put(buf)
+	buf := BufPool.Get().([]byte)
+	defer BufPool.Put(buf)
 	for {
 		nr, er := src.Read(buf)
 		//if len(pr)>0 && pr[0] && nr > 50 {

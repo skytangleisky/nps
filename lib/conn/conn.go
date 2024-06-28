@@ -182,8 +182,8 @@ func (s *Conn) SendHealthInfo(info, status string) (int, error) {
 // get health info from conn
 func (s *Conn) GetHealthInfo() (info string, status bool, err error) {
 	var l int
-	buf := common.BufPoolMax.Get().([]byte)
-	defer common.PutBufPoolMax(buf)
+	buf := common.BufPool.Get().([]byte)
+	defer common.BufPool.Put(buf)
 	if l, err = s.GetLen(); err != nil {
 		return
 	} else if _, err = s.ReadLen(l, buf); err != nil {
@@ -256,8 +256,8 @@ func (s *Conn) SendInfo(t interface{}, flag string) (int, error) {
 // get task info
 func (s *Conn) getInfo(t interface{}) (err error) {
 	var l int
-	buf := common.BufPoolMax.Get().([]byte)
-	defer common.PutBufPoolMax(buf)
+	buf := common.BufPool.Get().([]byte)
+	defer common.BufPool.Put(buf)
 	if l, err = s.GetLen(); err != nil {
 		return
 	} else if _, err = s.ReadLen(l, buf); err != nil {
