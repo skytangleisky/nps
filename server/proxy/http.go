@@ -228,9 +228,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			defer targetConn.Close()
 			err = r.Write(targetConn)
 			if err != nil {
-				logs.Error(err)
 				w.Header().Set("Access-Control-Allow-Origin", "*")
-				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
+				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
 				return
 			}
 			targetConn2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
@@ -238,7 +237,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			targetReader := bufio.NewReader(targetConn2)
 			resp, err := http.ReadResponse(targetReader, nil)
 			if err != nil {
-				logs.Error(err)
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
 				return
 			}
 			defer resp.Body.Close()

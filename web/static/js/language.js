@@ -163,24 +163,81 @@ function submitform(action, url, postdata) {
             });
     }
 }
+function changeunit(len) {
+	//1 Byte(B) = 8bit = 8b
+	//1 Kilo    Byte(KB) = 1024B
+	//1 Mega    Byte(MB) = 1024KB
+	//1 Giga    Byte(GB) = 1024MB
+	//1 Tera    Byte(TB) = 1024GB
+	//1 Peta    Byte(PB) = 1024TB
+	//1 Exa     Byte(EB) = 1024PB
+	//1 Zetta   Byte(ZB) = 1024EB
+	//1 Yotta   Byte(YB) = 1024ZB
+	//1 Bronto  Byte(BB) = 1024YB
+	//1 Nona    Byte(NB) = 1024BB
+	//1 Dogga   Byte(DB) = 1024NB
+	//1 Corydon Byte(CB) = 1024DB
+	//1 Xero    Byte(XB) = 1024CB
 
-function changeunit(limit) {
-    var size = "";
-    if (limit < 0.1 * 1024) {
-        size = limit.toFixed(2) + "B";
-    } else if (limit < 0.1 * 1024 * 1024) {
-        size = (limit / 1024).toFixed(2) + "KB";
-    } else if (limit < 0.1 * 1024 * 1024 * 1024) {
-        size = (limit / (1024 * 1024)).toFixed(2) + "MB";
-    } else {
-        size = (limit / (1024 * 1024 * 1024)).toFixed(2) + "GB";
-    }
+	let Bit = len
+	let KB = Bit / 1024
+	let MB = KB / 1024
+	let GB = MB / 1024
+	let TB = GB / 1024
+	let PB = TB / 1024
+	let EB = PB / 1024
+	let ZB = EB / 1024
+	let YB = ZB / 1024
+	let BB = YB / 1024
+	let NB = BB / 1024
+	let CB = NB / 1024
+	let XB = CB / 1024
+	if (Bit < 1024) {
+		return Bit.toFixed(2) + "B"
+	} else if (KB < 1024) {
+		return KB.toFixed(2) + "KB"
+	} else if (MB < 1024) {
+		return MB.toFixed(2) + "MB"
+	} else if (GB < 1024) {
+		return GB.toFixed(2) + "GB"
+	} else if (TB < 1024) {
+		return TB.toFixed(2) + "TB"
+	} else if (PB < 1024) {
+		return PB.toFixed(2) + "PB"
+	} else if (EB < 1024) {
+		return EB.toFixed(2) + "EB"
+	} else if (ZB < 1024) {
+		return ZB.toFixed(2) + "ZB"
+	} else if (YB < 1024) {
+		return YB.toFixed(2) + "YB"
+	} else if (BB < 1024) {
+		return BB.toFixed(2) + "BB"
+	} else if (NB < 1024) {
+		return NB.toFixed(2) + "NB"
+	} else if (CB < 1024) {
+		return CB.toFixed(2) + "CB"
+	} else {
+		return XB.toFixed(2)+ "XB"
+	}
 
-    var sizeStr = size + "";
-    var index = sizeStr.indexOf(".");
-    var dou = sizeStr.substr(index + 1, 2);
-    if (dou == "00") {
-        return sizeStr.substring(0, index) + sizeStr.substr(index + 3, 2);
-    }
-    return size;
 }
+// function changeunit(limit) {
+//     var size = "";
+//     if (limit < 0.1 * 1024) {
+//         size = limit.toFixed(2) + "B";
+//     } else if (limit < 0.1 * 1024 * 1024) {
+//         size = (limit / 1024).toFixed(2) + "KB";
+//     } else if (limit < 0.1 * 1024 * 1024 * 1024) {
+//         size = (limit / (1024 * 1024)).toFixed(2) + "MB";
+//     } else {
+//         size = (limit / (1024 * 1024 * 1024)).toFixed(2) + "GB";
+//     }
+//
+//     var sizeStr = size + "";
+//     var index = sizeStr.indexOf(".");
+//     var dou = sizeStr.substr(index + 1, 2);
+//     if (dou == "00") {
+//         return sizeStr.substring(0, index) + sizeStr.substr(index + 3, 2);
+//     }
+//     return size;
+// }
