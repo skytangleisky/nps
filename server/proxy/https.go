@@ -101,7 +101,7 @@ func (https *HttpsServer) Start() error {
 				l = v.(*HttpsListener)
 			} else {
 				r := buildHttpsRequest(serverName)
-				if host, err := file.GetDb().GetInfoByHost(serverName, r); err != nil {
+				if host, err := file.GetDb().GetInfoByHost(serverName, r, "https"); err != nil {
 					c.Close()
 					logs.Notice("the url %s can't be parsed!,remote addr %s", serverName, c.RemoteAddr().String())
 					return
@@ -149,7 +149,7 @@ func (https *HttpsServer) handleHttps(c net.Conn) {
 	r := buildHttpsRequest(hostName)
 	var host *file.Host
 	var err error
-	if host, err = file.GetDb().GetInfoByHost(hostName, r); err != nil {
+	if host, err = file.GetDb().GetInfoByHost(hostName, r, "https"); err != nil {
 		c.Close()
 		logs.Notice("the url %s can't be parsed!", hostName)
 		return

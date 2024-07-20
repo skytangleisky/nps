@@ -308,7 +308,7 @@ func (s *DbUtils) GetHostById(id int) (h *Host, err error) {
 }
 
 // get key by host from x
-func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err error) {
+func (s *DbUtils) GetInfoByHost(host string, r *http.Request, scheme string) (h *Host, err error) {
 	var hosts []*Host
 	//Handling Ported Access
 	host = common.GetIpByAddr(host)
@@ -317,7 +317,7 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err erro
 		if v.IsClose {
 			return true
 		}
-		if v.Scheme == "all" || v.Scheme == r.URL.Scheme {
+		if v.Scheme == "all" || v.Scheme == scheme {
 			tmpHost := v.Host
 			if strings.Contains(tmpHost, "*") {
 				tmpHost = strings.Replace(tmpHost, "*", "", -1)

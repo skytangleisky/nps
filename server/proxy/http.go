@@ -58,40 +58,41 @@ func (s *httpServer) Start() error {
 		s.errorContent = []byte("nps 404")
 	}
 	if s.httpPort > 0 {
-		s.httpServer = s.NewServer(s.httpPort, "http")
-		go func() {
-			l, err := connection.GetHttpListener()
-			if err != nil {
-				logs.Error(err)
-				os.Exit(0)
-			}
-			err = s.httpServer.Serve(l)
-			if err != nil {
-				logs.Error(err)
-				os.Exit(0)
-			}
-		}()
-		//tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(s.httpPort))
-		//tcpListener, err := net.ListenTCP("tcp", tcpAddr)
-		//if err != nil {
-		// logs.Error(err)
-		//  os.Exit(0)
-		//} else {
-		// go func() {
-		//    for {
-		//       tcpConn, err := tcpListener.AcceptTCP()
-		//       if err != nil {
-		//          logs.Error(err)
-		//          tcpConn.Close()
-		//       } else {
-		//          go func() {
-		//             s.Process(tcpConn)
-		//          }()
-		//       }
-		//
-		//    }
-		// }()
-		//}
+		//当通过接口返回的数据比较大（如2.5MB），短时间内多次调用前面的接口，用下面的代码会出错
+		//s.httpServer = s.NewServer(s.httpPort, "http")
+		//go func() {
+		//	l, err := connection.GetHttpListener()
+		//	if err != nil {
+		//		logs.Error(err)
+		//		os.Exit(0)
+		//	}
+		//	err = s.httpServer.Serve(l)
+		//	if err != nil {
+		//		logs.Error(err)
+		//		os.Exit(0)
+		//	}
+		//}()
+
+		tcpAddr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:"+strconv.Itoa(s.httpPort))
+		tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+		if err != nil {
+			logs.Error(err)
+		} else {
+			go func() {
+				for {
+					tcpConn, err := tcpListener.AcceptTCP()
+					if err != nil {
+						logs.Error(err)
+						tcpConn.Close()
+					} else {
+						go func() {
+							s.Process(tcpConn)
+						}()
+					}
+
+				}
+			}()
+		}
 
 	}
 	if s.httpsPort > 0 {
@@ -121,7 +122,7 @@ func (s *httpServer) Close() error {
 	return nil
 }
 
-func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
+func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, scheme string) {
 	var (
 		host       *file.Host
 		target     net.Conn
@@ -131,7 +132,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 		lk         *conn.Link
 		targetAddr string
 	)
-	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
+	if host, err = file.GetDb().GetInfoByHost(r.Host, r, scheme); err != nil {
 		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
 		return
 	}
@@ -259,10 +260,82 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 	return &http.Server{
 		Addr: ":" + strconv.Itoa(port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.URL.Scheme = scheme
-			s.handleTunneling(w, r)
+			//r.URL.Scheme = scheme
+			s.handleTunneling(w, r, scheme)
 		}),
 		// Disable HTTP/2.
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
+}
+
+func (s *httpServer) Process(tcpConn *net.TCPConn) {
+	if r, err := http.ReadRequest(bufio.NewReader(tcpConn)); err != nil || r == nil {
+		// if there got broken pipe, http.ReadResponse will get a nil
+		return
+	} else {
+		//r.URL.Scheme = "http"
+		s.handleHttp(conn.NewConn(tcpConn), r, "http")
+	}
+}
+func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request, scheme string) {
+	var (
+		host       *file.Host
+		target     net.Conn
+		err        error
+		connClient net.Conn
+		//scheme     = r.URL.Scheme
+		lk         *conn.Link
+		targetAddr string
+		isReset    bool
+	)
+	defer func() {
+		if connClient != nil {
+			connClient.Close()
+		} else {
+			s.writeConnFail(c.Conn)
+		}
+		c.Close()
+	}()
+	//reset:
+	if isReset {
+		host.Client.AddConn()
+	}
+	if host, err = file.GetDb().GetInfoByHost(r.Host, r, scheme); err != nil {
+		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
+		return
+	}
+	if err := s.CheckFlowAndConnNum(host.Client); err != nil {
+		logs.Warn("client id %d, host id %d, error %s, when https connection", host.Client.Id, host.Id, err.Error())
+		return
+	}
+	if !isReset {
+		defer host.Client.AddConn()
+	}
+	if err = s.auth(r, host.Client.Cnf.U, host.Client.Cnf.P); err != nil {
+		c.Write([]byte(common.UnauthorizedBytes))
+		logs.Warn("auth error", err, r.RemoteAddr)
+		return
+	}
+	if targetAddr, err = host.Target.GetRandomTarget(); err != nil {
+		logs.Warn(err.Error())
+		return
+	}
+	lk = conn.NewLink("http", targetAddr, host.Client.Cnf.Crypt, host.Client.Cnf.Compress, r.RemoteAddr, host.Target.LocalProxy)
+	if target, err = s.bridge.SendLinkInfo(host.Client.Id, lk, nil); err != nil {
+		logs.Notice("connect to target %s error %s", lk.Host, err)
+		return
+	}
+	connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+
+	//change the host and header and set proxy setting
+	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, c.Conn.RemoteAddr().String(), s.addOrigin)
+	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, c.RemoteAddr().String(), lk.Host)
+
+	err = r.Write(connClient)
+	if err != nil {
+		logs.Error(err)
+		return
+	}
+	conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
+	//conn.CopyWaitGroup(connClient, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)//错误用法
 }
