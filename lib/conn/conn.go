@@ -435,26 +435,28 @@ func CopyWaitGroup2(conn1, conn2 net.Conn, flow *file.Flow) {
 
 // get crypt or snappy conn
 func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.Conn {
+	var c net.Conn
 	if cpt {
 		if snappy { // 加密压缩
 			if isServer {
-				return rate.NewRateConn(NewSnappyConn(crypt.NewTlsServerConn(conn)), rt)
+				c = NewSnappyConn(crypt.NewTlsServerConn(conn))
 			}
-			return rate.NewRateConn(NewSnappyConn(crypt.NewTlsClientConn(conn)), rt)
+			c = NewSnappyConn(crypt.NewTlsClientConn(conn))
 		} else { // 加密不压缩
 			if isServer {
-				return rate.NewRateConn(crypt.NewTlsServerConn(conn), rt)
+				c = crypt.NewTlsServerConn(conn)
 			}
-			return rate.NewRateConn(crypt.NewTlsClientConn(conn), rt)
+			c = crypt.NewTlsClientConn(conn)
 		}
 	} else {
 		if snappy { // 不加密压缩
-			return rate.NewRateConn(NewSnappyConn(conn), rt)
+			c = NewSnappyConn(conn)
 		} else { // 不加密不压缩
-			return rate.NewRateConn(conn, rt)
-			//return conn
+			c = conn
 		}
 	}
+	return c
+	//return rate.NewRateConn(c, rt)
 }
 
 type LenConn struct {

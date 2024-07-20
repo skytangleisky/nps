@@ -337,5 +337,4 @@ func (s *httpServer) handleHttp(c *conn.Conn, r *http.Request, scheme string) {
 		return
 	}
 	conn.CopyWaitGroup(target, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)
-	//conn.CopyWaitGroup(connClient, c.Conn, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, c.Rb)//错误用法
 }

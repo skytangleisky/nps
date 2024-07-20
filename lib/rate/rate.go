@@ -35,6 +35,8 @@ func (s *Rate) SetRate(size int64) {
 	s.bucketSurplusSize = s.bucketSize
 }
 func (s *Rate) Get(size int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.bucketSize > 0 {
 		if s.bucketSurplusSize >= size {
 			atomic.AddInt64(&s.bucketSurplusSize, -size)
