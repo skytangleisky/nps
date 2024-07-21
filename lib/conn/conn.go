@@ -440,13 +440,15 @@ func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.
 		if snappy { // 加密压缩
 			if isServer {
 				c = NewSnappyConn(crypt.NewTlsServerConn(conn))
+			} else {
+				c = NewSnappyConn(crypt.NewTlsClientConn(conn))
 			}
-			c = NewSnappyConn(crypt.NewTlsClientConn(conn))
 		} else { // 加密不压缩
 			if isServer {
 				c = crypt.NewTlsServerConn(conn)
+			} else {
+				c = crypt.NewTlsClientConn(conn)
 			}
-			c = crypt.NewTlsClientConn(conn)
 		}
 	} else {
 		if snappy { // 不加密压缩
