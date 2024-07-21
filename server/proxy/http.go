@@ -162,12 +162,13 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			conn.CopyWaitGroup2(target, c, host.Flow)
 		} else {
 			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-
-			err = r.Write(connClient) //第1次r.Method正常
+			//第1次r.Method=POST
+			err = r.Write(connClient)
 			if err != nil {
 				logs.Error(err)
 				return
 			}
+			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
 			if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
 				// if there got broken pipe, http.ReadResponse will get a nil
 				return
@@ -175,14 +176,14 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 				resp.Write(c)
 			}
 
-			//第2次r.Method缺少第一个字节
+			//第2次r.Method=OST,需要手动纠正OST->POST,ET->GET,...
 			if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
 				return
 			}
 			r.Method = resetReqMethod(r.Method)
 			r.Write(connClient)
 
-			//第>=3次r.Method正常
+			//第>=3次r.Method=POST
 			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, nil)
 		}
 	} else {
