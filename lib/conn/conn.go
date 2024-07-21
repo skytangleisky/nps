@@ -455,8 +455,8 @@ func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.
 			c = conn
 		}
 	}
-	return c
-	//return rate.NewRateConn(c, rt)
+	return rate.NewRateConn(c, rt)
+	//return c
 }
 
 type LenConn struct {

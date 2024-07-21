@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,7 +58,6 @@ func (s *httpServer) Start() error {
 		s.errorContent = []byte("nps 404")
 	}
 	if s.httpPort > 0 {
-		//当通过接口返回的数据比较大（如2.5MB），短时间内多次调用前面的接口，用下面的代码会出错
 		s.httpServer = s.NewServer(s.httpPort, "http")
 		go func() {
 			l, err := connection.GetHttpListener()
@@ -106,6 +104,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 		host       *file.Host
 		target     net.Conn
 		err        error
+		connClient net.Conn
+		//scheme     = r.URL.Scheme
 		lk         *conn.Link
 		targetAddr string
 	)
@@ -137,6 +137,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 	//change the host and header and set proxy setting
 	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, r.RemoteAddr, s.addOrigin)
 	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, r.RemoteAddr, lk.Host)
+
 	hijacker, ok := w.(http.Hijacker)
 	if ok {
 		c, _, err := hijacker.Hijack()
@@ -144,11 +145,6 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		ctx := r.Context()
-		go func() {
-			<-ctx.Done()
-			c.Close()
-		}()
 		//defer func() {
 		//	if connClient != nil {
 		//		connClient.Close()
@@ -165,14 +161,29 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			conn.CopyWaitGroup2(target, c, host.Flow)
 		} else {
-			conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			dump, err := httputil.DumpRequest(r, true)
+			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+
+			err = r.Write(connClient) //第1次r.Method正常
 			if err != nil {
-				http.Error(w, "Unable to dump request", http.StatusInternalServerError)
+				logs.Error(err)
 				return
 			}
-			target.Write(dump)
-			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, dump)
+			if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
+				// if there got broken pipe, http.ReadResponse will get a nil
+				return
+			} else {
+				resp.Write(c)
+			}
+
+			//第2次r.Method缺少第一个字节
+			if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
+				return
+			}
+			r.Method = resetReqMethod(r.Method)
+			r.Write(connClient)
+
+			//第>=3次r.Method正常
+			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, nil)
 		}
 	} else {
 		ctx := r.Context()
@@ -235,6 +246,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			//io.Copy(w, resp.Body)
 		}
 	}
+
 }
 
 func (s *httpServer) NewServer(port int, scheme string) *http.Server {
@@ -247,4 +259,14 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 		// Disable HTTP/2.
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
+}
+
+func resetReqMethod(method string) string {
+	if method == "ET" {
+		return "GET"
+	}
+	if method == "OST" {
+		return "POST"
+	}
+	return method
 }
