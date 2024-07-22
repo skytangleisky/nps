@@ -145,14 +145,6 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		//defer func() {
-		//	if connClient != nil {
-		//		connClient.Close()
-		//	} else {
-		//		s.writeConnFail(c)
-		//	}
-		//	c.Close()
-		//}()
 		if host.Target.LocalProxy {
 			err = r.Write(target)
 			if err != nil {
@@ -161,29 +153,13 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			conn.CopyWaitGroup2(target, c, host.Flow)
 		} else {
+			//https://go-review.googlesource.com/c/go/+/133416/1/src/net/http/server.go#1909
 			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			//第1次r.Method=POST
 			err = r.Write(connClient)
 			if err != nil {
 				logs.Error(err)
 				return
 			}
-			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			if resp, err := http.ReadResponse(bufio.NewReader(connClient), r); err != nil || resp == nil || r == nil {
-				// if there got broken pipe, http.ReadResponse will get a nil
-				return
-			} else {
-				resp.Write(c)
-			}
-
-			//第2次r.Method=OST,需要手动纠正OST->POST,ET->GET,...
-			if r, err = http.ReadRequest(bufio.NewReader(c)); err != nil {
-				return
-			}
-			r.Method = resetReqMethod(r.Method)
-			r.Write(connClient)
-
-			//第>=3次r.Method=POST
 			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, nil)
 		}
 	} else {
@@ -260,14 +236,4 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 		// Disable HTTP/2.
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
-}
-
-func resetReqMethod(method string) string {
-	if method == "ET" {
-		return "GET"
-	}
-	if method == "OST" {
-		return "POST"
-	}
-	return method
 }
