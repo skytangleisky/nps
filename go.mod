@@ -21,6 +21,7 @@ require (
 require (
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/hooklift/assert v0.0.0-20170704181755-9d1defd6d214 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
 	github.com/klauspost/pgzip v1.2.1 // indirect
