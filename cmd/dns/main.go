@@ -63,11 +63,11 @@ func (s *DnsServer) mapToStruct(data map[string]interface{}, result interface{})
 	return result
 }
 
-func (s *DnsServer) process(answerPtr *[]dns.RR, record Record) {
+func (s *DnsServer) process(q dns.Question, answerPtr *[]dns.RR, record Record) {
 	if record.Type == "A" {
 		*answerPtr = append(*answerPtr, &dns.A{
 			Hdr: dns.RR_Header{
-				Name:   record.Name + ".",
+				Name:   q.Name,
 				Rrtype: dns.TypeA,
 				Class:  dns.ClassINET,
 				Ttl:    uint32(record.TTL),
@@ -78,7 +78,7 @@ func (s *DnsServer) process(answerPtr *[]dns.RR, record Record) {
 	} else if record.Type == "AAAA" {
 		*answerPtr = append(*answerPtr, &dns.AAAA{
 			Hdr: dns.RR_Header{
-				Name:   record.Name + ".",
+				Name:   q.Name,
 				Rrtype: dns.TypeAAAA,
 				Class:  dns.ClassINET,
 				Ttl:    uint32(record.TTL),
@@ -104,17 +104,17 @@ func (s *DnsServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 			if record.Status == "启用" {
 				if record.Domain == "*" {
 					if strings.HasSuffix(q.Name, "."+record.Name+".") {
-						s.process(&msg.Answer, record)
+						s.process(q, &msg.Answer, record)
 						flag = true
 					}
 				} else if record.Domain == "@" {
 					if q.Name == record.Name+"." {
-						s.process(&msg.Answer, record)
+						s.process(q, &msg.Answer, record)
 						flag = true
 					}
 				} else {
 					if q.Name == record.Domain+"."+record.Name+"." {
-						s.process(&msg.Answer, record)
+						s.process(q, &msg.Answer, record)
 						flag = true
 					}
 				}
