@@ -1,14 +1,19 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"strings"
 )
 
 // 定义Socks5协议的常量
 const (
+	socks4Version        = 0x04
 	socks5Version        = 0x05
 	socks5AuthNone       = 0x00
 	socks5AuthPassword   = 0x02
@@ -34,11 +39,80 @@ func handleConnection(conn net.Conn) {
 		fmt.Println("Failed to read from client:", err)
 		return
 	}
-	if buf[0] != socks5Version {
-		fmt.Println("Unsupported SOCKS version:", buf[0])
+	if buf[0] == socks4Version {
+		handleSocks4(conn, buf)
+	} else if buf[0] == socks5Version {
+		handSocks5(conn, buf)
+	} else {
+		handleHTTP(conn, buf)
+	}
+}
+
+func handleHTTP(conn net.Conn, buf []byte) {
+	request, err := http.ReadRequest(bufio.NewReader(io.MultiReader(bytes.NewReader(buf), conn)))
+	if err != nil {
+		fmt.Println("Failed to read HTTP request:", err)
 		return
 	}
 
+	fmt.Println(request.Proto, request.Method, request.Host)
+	destAddr := request.Host
+	if !strings.Contains(request.Host, ":") {
+		if strings.HasPrefix(request.Proto, "https") {
+			destAddr += ":443"
+		} else {
+			destAddr += ":80"
+		}
+	}
+
+	destConn, err := net.Dial("tcp", destAddr)
+	if err != nil {
+		fmt.Println("Failed to connect to destination:", err)
+		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+		return
+	}
+	defer destConn.Close()
+
+	if request.Method == "CONNECT" {
+		conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+	} else {
+		request.Write(destConn)
+	}
+
+	go io.Copy(destConn, conn)
+	io.Copy(conn, destConn)
+}
+
+func handleSocks4(conn net.Conn, buf []byte) {
+	// 解析Socks4请求
+	if buf[1] != 0x01 {
+		fmt.Println("Unsupported Socks4 command:", buf[1])
+		conn.Write([]byte{0x00, 0x5b})
+		return
+	}
+
+	port := binary.BigEndian.Uint16(buf[2:4])
+	addr := net.IP(buf[4:8]).String()
+
+	// 打印转发请求的地址和端口
+	fmt.Printf("SOCKS4 CONNECT %s:%d\n", addr, port)
+
+	destAddr := fmt.Sprintf("%s:%d", addr, port)
+	destConn, err := net.Dial("tcp", destAddr)
+	if err != nil {
+		fmt.Println("Failed to connect to destination:", err)
+		conn.Write([]byte{0x00, 0x5b})
+		return
+	}
+	defer destConn.Close()
+
+	conn.Write([]byte{0x00, 0x5a, buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]})
+
+	go io.Copy(destConn, conn)
+	io.Copy(conn, destConn)
+}
+
+func handSocks5(conn net.Conn, buf []byte) {
 	// 支持无认证和用户名/密码认证
 	authMethod := buf[2]
 	if authMethod != socks5AuthNone && authMethod != socks5AuthPassword {
@@ -51,7 +125,7 @@ func handleConnection(conn net.Conn) {
 	conn.Write([]byte{socks5Version, socks5AuthNone})
 
 	// 读取客户端的请求
-	_, err = conn.Read(buf)
+	_, err := conn.Read(buf)
 	if err != nil {
 		fmt.Println("Failed to read from client:", err)
 		return
@@ -97,6 +171,7 @@ func handleConnection(conn net.Conn) {
 
 func handleConnect(conn net.Conn, addr string, port uint16) {
 	destAddr := fmt.Sprintf("%s:%d", addr, port)
+	fmt.Println("SOCKS5 CONNECT " + destAddr)
 	destConn, err := net.Dial("tcp", destAddr)
 	if err != nil {
 		fmt.Println("Failed to connect to destination:", err)
