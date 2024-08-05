@@ -1,219 +1,425 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
-	"strings"
 )
 
-// 定义Socks5协议的常量
 const (
-	socks4Version        = 0x04
-	socks5Version        = 0x05
-	socks5AuthNone       = 0x00
-	socks5AuthPassword   = 0x02
-	socks5CmdConnect     = 0x01
-	socks5CmdBind        = 0x02
-	socks5CmdUDP         = 0x03
-	socks5AddrTypeIPv4   = 0x01
-	socks5AddrTypeDomain = 0x03
-	socks5AddrTypeIPv6   = 0x04
-	socks5AuthSuccess    = 0x00
-	socks5AuthFailure    = 0x01
-	socks5RepSuccess     = 0x00
-	socks5RepFailure     = 0x01
+	socks5Version           = 0x05
+	socks5AuthNone          = 0x00
+	socks5AuthPassword      = 0x02
+	socks5AuthNoAccept      = 0xFF
+	socks5CmdConnect        = 0x01
+	socks5CmdBind           = 0x02
+	socks5CmdUDP            = 0x03
+	socks5AddressTypeIPV4   = 0x01
+	socks5AddressTypeDomain = 0x03
+	socks5AddressTypeIPV6   = 0x04
 )
 
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	buf := make([]byte, 1024)
-	// 读取版本和认证方法
-	_, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Failed to read from client:", err)
-		return
-	}
-	if buf[0] == socks4Version {
-		handleSocks4(conn, buf)
-	} else if buf[0] == socks5Version {
-		handSocks5(conn, buf)
-	} else {
-		handleHTTP(conn, buf)
-	}
-}
-
-func handleHTTP(conn net.Conn, buf []byte) {
-	request, err := http.ReadRequest(bufio.NewReader(io.MultiReader(bytes.NewReader(buf), conn)))
-	if err != nil {
-		fmt.Println("Failed to read HTTP request:", err)
-		return
-	}
-
-	fmt.Println(request.Proto, request.Method, request.Host)
-	destAddr := request.Host
-	if !strings.Contains(request.Host, ":") {
-		if strings.HasPrefix(request.Proto, "https") {
-			destAddr += ":443"
-		} else {
-			destAddr += ":80"
-		}
-	}
-
-	destConn, err := net.Dial("tcp", destAddr)
-	if err != nil {
-		fmt.Println("Failed to connect to destination:", err)
-		conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-		return
-	}
-	defer destConn.Close()
-
-	if request.Method == "CONNECT" {
-		conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-	} else {
-		request.Write(destConn)
-	}
-
-	go io.Copy(destConn, conn)
-	io.Copy(conn, destConn)
-}
-
-func handleSocks4(conn net.Conn, buf []byte) {
-	// 解析Socks4请求
-	if buf[1] != 0x01 {
-		fmt.Println("Unsupported Socks4 command:", buf[1])
-		conn.Write([]byte{0x00, 0x5b})
-		return
-	}
-
-	port := binary.BigEndian.Uint16(buf[2:4])
-	addr := net.IP(buf[4:8]).String()
-
-	// 打印转发请求的地址和端口
-	fmt.Printf("SOCKS4 CONNECT %s:%d\n", addr, port)
-
-	destAddr := fmt.Sprintf("%s:%d", addr, port)
-	destConn, err := net.Dial("tcp", destAddr)
-	if err != nil {
-		fmt.Println("Failed to connect to destination:", err)
-		conn.Write([]byte{0x00, 0x5b})
-		return
-	}
-	defer destConn.Close()
-
-	conn.Write([]byte{0x00, 0x5a, buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]})
-
-	go io.Copy(destConn, conn)
-	io.Copy(conn, destConn)
-}
-
-func handSocks5(conn net.Conn, buf []byte) {
-	// 支持无认证和用户名/密码认证
-	authMethod := buf[2]
-	if authMethod != socks5AuthNone && authMethod != socks5AuthPassword {
-		fmt.Println("Unsupported auth method:", authMethod)
-		conn.Write([]byte{socks5Version, socks5AuthFailure})
-		return
-	}
-
-	// 返回选择的认证方法
-	conn.Write([]byte{socks5Version, socks5AuthNone})
-
-	// 读取客户端的请求
-	_, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Failed to read from client:", err)
-		return
-	}
-	if buf[0] != socks5Version {
-		fmt.Println("Unsupported SOCKS version:", buf[0])
-		return
-	}
-	cmd := buf[1]
-	addrType := buf[3]
-	var addr string
-	var port uint16
-
-	switch addrType {
-	case socks5AddrTypeIPv4:
-		addr = net.IP(buf[4:8]).String()
-		port = binary.BigEndian.Uint16(buf[8:10])
-	case socks5AddrTypeDomain:
-		addrLen := buf[4]
-		addr = string(buf[5 : 5+addrLen])
-		port = binary.BigEndian.Uint16(buf[5+addrLen : 5+addrLen+2])
-	case socks5AddrTypeIPv6:
-		addr = net.IP(buf[4:20]).String()
-		port = binary.BigEndian.Uint16(buf[20:22])
-	default:
-		fmt.Println("Unsupported address type:", addrType)
-		conn.Write([]byte{socks5Version, socks5RepFailure})
-		return
-	}
-
-	switch cmd {
-	case socks5CmdConnect:
-		handleConnect(conn, addr, port)
-	case socks5CmdBind:
-		handleBind(conn, addr, port)
-	case socks5CmdUDP:
-		handleUDP(conn, addr, port)
-	default:
-		fmt.Println("Unsupported command:", cmd)
-		conn.Write([]byte{socks5Version, socks5RepFailure})
-	}
-}
-
-func handleConnect(conn net.Conn, addr string, port uint16) {
-	destAddr := fmt.Sprintf("%s:%d", addr, port)
-	fmt.Println("SOCKS5 CONNECT " + destAddr)
-	destConn, err := net.Dial("tcp", destAddr)
-	if err != nil {
-		fmt.Println("Failed to connect to destination:", err)
-		conn.Write([]byte{socks5Version, socks5RepFailure})
-		return
-	}
-	defer destConn.Close()
-
-	// 返回成功响应
-	conn.Write([]byte{socks5Version, socks5RepSuccess, 0x00, socks5AddrTypeIPv4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	go io.Copy(destConn, conn)
-	io.Copy(conn, destConn)
-}
-
-func handleBind(conn net.Conn, addr string, port uint16) {
-	// TODO: 实现BIND命令的处理
-	fmt.Println("BIND command not implemented")
-	conn.Write([]byte{socks5Version, socks5RepFailure})
-}
-
-func handleUDP(conn net.Conn, addr string, port uint16) {
-	// TODO: 实现UDP命令的处理
-	fmt.Println("UDP command not implemented")
-	conn.Write([]byte{socks5Version, socks5RepFailure})
-}
+var (
+	Username = "username"
+	Password = "password"
+)
 
 func main() {
-	listener, err := net.Listen("tcp", ":1080")
+	ln, err := net.Listen("tcp", ":1181")
 	if err != nil {
-		fmt.Println("Failed to start server:", err)
+		fmt.Println("Error starting server:", err)
 		return
 	}
-	defer listener.Close()
-	fmt.Println("SOCKS5 server is listening on port 1080")
+	defer ln.Close()
 
+	fmt.Println("SOCKS5 proxy listening on :1181")
 	for {
-		conn, err := listener.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println("Failed to accept connection:", err)
+			fmt.Println("Error accepting connection:", err)
 			continue
 		}
 		go handleConnection(conn)
 	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	// 1. 协商认证方式
+	if err := negotiateAuth(conn); err != nil {
+		fmt.Println("Authentication negotiation failed:", err)
+		return
+	}
+
+	// 2. 处理客户端请求
+	if err := handleRequest(conn); err != nil {
+		fmt.Println("Request handling failed:", err)
+		return
+	}
+}
+
+func negotiateAuth(conn net.Conn) error {
+	// 读取版本和支持的认证方式
+	buf := make([]byte, 2)
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		return err
+	}
+	version := buf[0]
+	nmethods := buf[1]
+
+	if version != socks5Version {
+		return fmt.Errorf("unsupported SOCKS version: %d", version)
+	}
+
+	// 读取认证方式列表
+	methods := make([]byte, nmethods)
+	if _, err := io.ReadFull(conn, methods); err != nil {
+		return err
+	}
+
+	// 检查是否支持无认证或用户名密码认证
+	authMethod := socks5AuthNoAccept
+	for _, method := range methods {
+		if method == socks5AuthNone {
+			authMethod = socks5AuthNone
+			break
+		} else if method == socks5AuthPassword {
+			authMethod = socks5AuthPassword
+		}
+	}
+
+	// 回复客户端选择的认证方式
+	conn.Write([]byte{socks5Version, byte(authMethod)})
+
+	if authMethod == socks5AuthPassword {
+		return handlePasswordAuth(conn)
+	} else if authMethod == socks5AuthNoAccept {
+		return fmt.Errorf("no supported authentication methods")
+	}
+	return nil
+}
+
+func handlePasswordAuth(conn net.Conn) error {
+	buf := make([]byte, 2)
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		return err
+	}
+
+	version := buf[0]
+	if version != 0x01 {
+		return fmt.Errorf("unsupported sub-negotiation version: %d", version)
+	}
+
+	ulen := buf[1]
+	uname := make([]byte, ulen)
+	if _, err := io.ReadFull(conn, uname); err != nil {
+		return err
+	}
+
+	if _, err := io.ReadFull(conn, buf[:1]); err != nil {
+		return err
+	}
+
+	plen := buf[0]
+	passwd := make([]byte, plen)
+	if _, err := io.ReadFull(conn, passwd); err != nil {
+		return err
+	}
+
+	if string(uname) != Username || string(passwd) != Password {
+		conn.Write([]byte{0x01, 0x01}) // Authentication failure
+		return fmt.Errorf("authentication failed")
+	}
+
+	conn.Write([]byte{0x01, 0x00}) // Authentication success
+	return nil
+}
+
+func handleRequest(conn net.Conn) error {
+	// 读取请求头
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return err
+	}
+
+	version := header[0]
+	cmd := header[1]
+	// reserved := header[2]
+	atyp := header[3]
+
+	if version != socks5Version {
+		return fmt.Errorf("unsupported SOCKS version: %d", version)
+	}
+
+	var destAddr string
+	switch atyp {
+	case socks5AddressTypeIPV4:
+		ip := make([]byte, 4)
+		if _, err := io.ReadFull(conn, ip); err != nil {
+			return err
+		}
+		port := make([]byte, 2)
+		if _, err := io.ReadFull(conn, port); err != nil {
+			return err
+		}
+		destAddr = fmt.Sprintf("%s:%d", net.IP(ip).String(), binary.BigEndian.Uint16(port))
+	case socks5AddressTypeDomain:
+		domainLen := make([]byte, 1)
+		if _, err := io.ReadFull(conn, domainLen); err != nil {
+			return err
+		}
+		domain := make([]byte, domainLen[0])
+
+		if _, err := io.ReadFull(conn, domain); err != nil {
+			return err
+		}
+		port := make([]byte, 2)
+		if _, err := io.ReadFull(conn, port); err != nil {
+			return err
+		}
+		destAddr = fmt.Sprintf("%s:%d", string(domain), binary.BigEndian.Uint16(port))
+	case socks5AddressTypeIPV6:
+		ip := make([]byte, 16)
+		if _, err := io.ReadFull(conn, ip); err != nil {
+			return err
+		}
+		port := make([]byte, 2)
+		if _, err := io.ReadFull(conn, port); err != nil {
+			return err
+		}
+		destAddr = fmt.Sprintf("[%s]:%d", net.IP(ip).String(), binary.BigEndian.Uint16(port))
+	default:
+		return fmt.Errorf("unsupported address type: %d", atyp)
+	}
+
+	switch cmd {
+	case socks5CmdConnect:
+		return handleConnect(conn, destAddr, atyp)
+	case socks5CmdBind:
+		return handleBind(conn, destAddr, atyp)
+	case socks5CmdUDP:
+		return handleUDP(conn, destAddr, atyp)
+	default:
+		return fmt.Errorf("unsupported command: %d", cmd)
+	}
+}
+
+func handleConnect(conn net.Conn, destAddr string, atyp byte) error {
+	// 连接目标服务器
+	targetConn, err := net.Dial("tcp", destAddr)
+	if err != nil {
+		conn.Write([]byte{socks5Version, 0x01, 0x00, atyp})
+		return err
+	}
+	fmt.Println(destAddr)
+	defer targetConn.Close()
+	bytes := []byte{socks5Version, 0x00, 0x00}
+	localAddr := targetConn.LocalAddr().(*net.TCPAddr)
+	localIP, localPort := localAddr.IP, localAddr.Port
+	ipBytes := localIP.To4()
+	if ipBytes != nil {
+		bytes = append(bytes, socks5AddressTypeIPV4)
+	} else {
+		ipBytes = localIP.To16()
+		bytes = append(bytes, socks5AddressTypeIPV6)
+	}
+	bytes = append(bytes, ipBytes...)
+	portBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(portBytes, uint16(localPort))
+	bytes = append(bytes, portBytes...)
+	// 响应客户端连接成功
+	conn.Write(bytes)
+
+	// 双向数据转发
+	go io.Copy(targetConn, conn)
+	io.Copy(conn, targetConn)
+
+	return nil
+}
+
+func handleBind(conn net.Conn, destAddr string, atyp byte) error {
+	// 创建监听端口
+	ln, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		conn.Write([]byte{socks5Version, 0x01, 0x00, atyp})
+		return err
+	}
+	defer ln.Close()
+
+	// 获取绑定的地址
+	localAddr := ln.Addr().(*net.TCPAddr)
+	localHost, localPort := localAddr.IP, localAddr.Port
+
+	// 响应客户端绑定成功
+	resp := make([]byte, 4)
+	resp[0] = socks5Version
+	resp[1] = 0x00
+	resp[2] = 0x00
+	resp[3] = socks5AddressTypeIPV4
+
+	resp = append(resp, localHost.To4()...)
+	port := make([]byte, 2)
+	binary.BigEndian.PutUint16(port, uint16(localPort))
+	resp = append(resp, port...)
+
+	conn.Write(resp)
+
+	// 等待入站连接
+	peerConn, err := ln.Accept()
+	if err != nil {
+		conn.Write([]byte{socks5Version, 0x01, 0x00, atyp})
+		return err
+	}
+	defer peerConn.Close()
+
+	// 获取对等连接的地址
+	peerAddr := peerConn.RemoteAddr().(*net.TCPAddr)
+	peerHost, peerPort := peerAddr.IP, peerAddr.Port
+
+	// 响应客户端连接成功
+	resp = make([]byte, 4)
+	resp[0] = socks5Version
+	resp[1] = 0x00
+	resp[2] = 0x00
+	resp[3] = socks5AddressTypeIPV4
+
+	resp = append(resp, peerHost.To4()...)
+	port = make([]byte, 2)
+	binary.BigEndian.PutUint16(port, uint16(peerPort))
+	resp = append(resp, port...)
+
+	conn.Write(resp)
+
+	// 双向数据转发
+	go io.Copy(peerConn, conn)
+	io.Copy(conn, peerConn)
+
+	return nil
+}
+
+func handleUDP(conn net.Conn, destAddr string, atyp byte) error {
+	// 创建 UDP 监听
+	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	if err != nil {
+		conn.Write([]byte{socks5Version, 0x01, 0x00, atyp})
+		return err
+	}
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		conn.Write([]byte{socks5Version, 0x01, 0x00, atyp})
+		return err
+	}
+	defer udpConn.Close()
+
+	// 获取 UDP 监听地址
+	localAddr := udpConn.LocalAddr().(*net.UDPAddr)
+	localHost, localPort := localAddr.IP, localAddr.Port
+
+	// 响应客户端 UDP 关联成功
+	resp := make([]byte, 4)
+	resp[0] = socks5Version
+	resp[1] = 0x00
+	resp[2] = 0x00
+	resp[3] = socks5AddressTypeIPV4
+
+	resp = append(resp, localHost.To4()...)
+	port := make([]byte, 2)
+	binary.BigEndian.PutUint16(port, uint16(localPort))
+	resp = append(resp, port...)
+
+	conn.Write(resp)
+
+	// 处理 UDP 数据包
+	go handleUDPRelay(udpConn)
+
+	return nil
+}
+
+func handleUDPRelay(udpConn *net.UDPConn) {
+	buf := make([]byte, 4096)
+	for {
+		n, addr, err := udpConn.ReadFromUDP(buf)
+		if err != nil {
+			fmt.Println("Error reading UDP packet:", err)
+			return
+		}
+
+		// 解析 UDP 包头
+		if n < 3 {
+			fmt.Println("Invalid UDP packet received")
+			continue
+		}
+
+		// 跳过前3个字节
+		packet := buf[3:n]
+
+		// 发送数据到目标地址
+		targetAddr, err := parseUDPAddress(packet)
+		if err != nil {
+			fmt.Println("Error parsing target address:", err)
+			continue
+		}
+
+		targetConn, err := net.Dial("udp", targetAddr)
+		if err != nil {
+			fmt.Println("Error connecting to target address:", err)
+			continue
+		}
+		defer targetConn.Close()
+
+		_, err = targetConn.Write(packet)
+		if err != nil {
+			fmt.Println("Error sending UDP packet to target:", err)
+		}
+
+		// 从目标地址接收响应
+		respBuf := make([]byte, 4096)
+		n, err = targetConn.Read(respBuf)
+		if err != nil {
+			fmt.Println("Error reading UDP response:", err)
+			continue
+		}
+
+		// 发送响应给客户端
+		udpConn.WriteToUDP(respBuf[:n], addr)
+	}
+}
+
+func parseUDPAddress(packet []byte) (string, error) {
+	if len(packet) < 4 {
+		return "", errors.New("invalid UDP packet")
+	}
+
+	atyp := packet[0]
+	var addr string
+	var port uint16
+
+	switch atyp {
+	case socks5AddressTypeIPV4:
+		if len(packet) < 7 {
+			return "", errors.New("invalid IPv4 address")
+		}
+		addr = net.IP(packet[1:5]).String()
+		port = binary.BigEndian.Uint16(packet[5:7])
+	case socks5AddressTypeDomain:
+		domainLen := int(packet[1])
+		if len(packet) < 2+domainLen+2 {
+			return "", errors.New("invalid domain address")
+		}
+		addr = string(packet[2 : 2+domainLen])
+		port = binary.BigEndian.Uint16(packet[2+domainLen : 2+domainLen+2])
+	case socks5AddressTypeIPV6:
+		if len(packet) < 19 {
+			return "", errors.New("invalid IPv6 address")
+		}
+		addr = net.IP(packet[1:17]).String()
+		port = binary.BigEndian.Uint16(packet[17:19])
+	default:
+		return "", fmt.Errorf("unsupported address type: %d", atyp)
+	}
+
+	return fmt.Sprintf("%s:%d", addr, port), nil
 }
