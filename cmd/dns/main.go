@@ -117,7 +117,6 @@ func (s *DnsServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 		flag := false
 		for _, result := range results {
 			record := Record{}
-			fmt.Println(result)
 			s.mapToStruct(result, &record)
 			if record.Status == "启用" {
 				if record.Domain == "*" {
