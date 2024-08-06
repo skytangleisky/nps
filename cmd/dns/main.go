@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 type Record struct {
@@ -27,7 +28,7 @@ type Record struct {
 	TTL        int64
 	Status     string
 	Remark     string
-	Createtime string
+	CreateTime string
 }
 
 // 上游 DNS 服务器地址
@@ -52,18 +53,25 @@ func (s *DnsServer) forwardDNSRequest(w dns.ResponseWriter, r *dns.Msg, q dns.Qu
 		return
 	}
 	logs.Info("Forward %s query for %s", client.Net, q.Name)
-	w.WriteMsg(response)
+	err = w.WriteMsg(response)
+	if err != nil {
+		logs.Error(err)
+	}
 }
 
-func (s *DnsServer) mapToStruct(data map[string]interface{}, result interface{}) interface{} {
-	r := reflect.ValueOf(result).Elem()
-	for k, v := range data {
+func (s *DnsServer) mapToStruct(result map[string]interface{}, ptr interface{}) {
+	r := reflect.ValueOf(ptr).Elem()
+	for k, v := range result {
 		f := r.FieldByName(k)
-		if f.IsValid() && f.CanSet() {
-			f.Set(reflect.ValueOf(v).Convert(f.Type()))
+		if f.IsValid() {
+			if f.CanSet() {
+				f.Set(reflect.ValueOf(v).Convert(f.Type()))
+			} else {
+				ptrToField := unsafe.Pointer(f.UnsafeAddr())
+				reflect.NewAt(f.Type(), ptrToField).Elem().Set(reflect.ValueOf(v).Convert(f.Type()))
+			}
 		}
 	}
-	return result
 }
 
 func (s *DnsServer) process(q dns.Question, answerPtr *[]dns.RR, record Record, w dns.ResponseWriter) {
@@ -109,6 +117,7 @@ func (s *DnsServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 		flag := false
 		for _, result := range results {
 			record := Record{}
+			fmt.Println(result)
 			s.mapToStruct(result, &record)
 			if record.Status == "启用" {
 				if record.Domain == "*" {
@@ -133,7 +142,10 @@ func (s *DnsServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 			s.forwardDNSRequest(w, r, q)
 		}
 	}
-	w.WriteMsg(&msg)
+	err := w.WriteMsg(&msg)
+	if err != nil {
+		logs.Error(err)
+	}
 }
 
 func (s *DnsServer) getResult() []map[string]interface{} {
@@ -229,7 +241,9 @@ func main() {
 			log.Fatalf("Failed to start TCP server: %v\n", err)
 		}
 	}()
-
+	//record := Record{}
+	//s.mapToStruct(map[string]interface{}{"CreateTime": "2024-07-28 07:18:06", "Domain": "@", "Id": 1, "Isp": "默认", "Name": "tanglei.top", "Record": "192.168.101.104", "Remark": "1", "Status": "暂停", "TTL": 300, "Type": "A", "Uuid": "1"}, &record)
+	//fmt.Println(record)
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	sig := <-sigs
