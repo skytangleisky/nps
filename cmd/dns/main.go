@@ -222,24 +222,35 @@ func main() {
 	defer db.Close()
 	s := &DnsServer{db}
 	var handlerFunc = dns.HandlerFunc(s.handleDNSRequest)
-
 	// 启动 UDP DNS 服务器
 	go func() {
 		log.Printf("Starting UDP DNS server on port 53")
-		err := dns.ListenAndServe(":53", "udp", handlerFunc)
+		server := &dns.Server{
+			Addr:    ":53",
+			Net:     "udp",
+			Handler: handlerFunc,
+			UDPSize: dns.MaxMsgSize,
+		}
+		err := server.ListenAndServe()
 		if err != nil {
-			log.Fatalf("Failed to start UDP server: %v\n", err)
+			logs.Error("Failed to start UDP server: %v\n", err)
 		}
 	}()
 
 	// 启动 TCP DNS 服务器
 	go func() {
 		log.Printf("Starting TCP DNS server on port 53")
-		err = dns.ListenAndServe(":53", "tcp", handlerFunc)
+		server := &dns.Server{
+			Addr:    ":53",
+			Net:     "tcp",
+			Handler: handlerFunc,
+		}
+		err := server.ListenAndServe()
 		if err != nil {
-			log.Fatalf("Failed to start TCP server: %v\n", err)
+			logs.Error("Failed to start TCP server: %v\n", err)
 		}
 	}()
+
 	//record := Record{}
 	//s.mapToStruct(map[string]interface{}{"CreateTime": "2024-07-28 07:18:06", "Domain": "@", "Id": 1, "Isp": "默认", "Name": "tanglei.top", "Record": "192.168.101.104", "Remark": "1", "Status": "暂停", "TTL": 300, "Type": "A", "Uuid": "1"}, &record)
 	//fmt.Println(record)
