@@ -101,10 +101,9 @@ func (s *httpServer) Close() error {
 
 func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, scheme string) {
 	var (
-		host       *file.Host
-		target     net.Conn
-		err        error
-		connClient net.Conn
+		host   *file.Host
+		target net.Conn
+		err    error
 		//scheme     = r.URL.Scheme
 		lk         *conn.Link
 		targetAddr string
@@ -165,8 +164,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			conn.CopyWaitGroup2(target, c, host.Flow)
 		} else {
 			//https://go-review.googlesource.com/c/go/+/133416/1/src/net/http/server.go#1909
-			connClient = conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			err = r.Write(connClient)
+			targetConn := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
+			err = r.Write(targetConn)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
