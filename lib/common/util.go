@@ -345,59 +345,59 @@ func CopyBuffer(dst io.Writer, src io.Reader, label ...string) (written int64, e
 
 func Changeunit(len int64) string {
 	//1 Byte(B) = 8bit = 8b
-	//1 Kilo    Byte(KB) = 1024B
-	//1 Mega    Byte(MB) = 1024KB
-	//1 Giga    Byte(GB) = 1024MB
-	//1 Tera    Byte(TB) = 1024GB
-	//1 Peta    Byte(PB) = 1024TB
-	//1 Exa     Byte(EB) = 1024PB
-	//1 Zetta   Byte(ZB) = 1024EB
-	//1 Yotta   Byte(YB) = 1024ZB
-	//1 Bronto  Byte(BB) = 1024YB
-	//1 Nona    Byte(NB) = 1024BB
-	//1 Dogga   Byte(DB) = 1024NB
-	//1 Corydon Byte(CB) = 1024DB
-	//1 Xero    Byte(XB) = 1024CB
+	//1 Kilo    Byte(KiB) = 1024B
+	//1 Mega    Byte(MiB) = 1024KiB
+	//1 Giga    Byte(GiB) = 1024MiB
+	//1 Tera    Byte(TiB) = 1024GiB
+	//1 Peta    Byte(PiB) = 1024TiB
+	//1 Exa     Byte(EiB) = 1024PiB
+	//1 Zetta   Byte(ZiB) = 1024EiB
+	//1 Yotta   Byte(YiB) = 1024ZiB
+	//1 Bronto  Byte(BiB) = 1024YiB
+	//1 Nona    Byte(NiB) = 1024BiB
+	//1 Dogga   Byte(DiB) = 1024NiB
+	//1 Corydon Byte(CiB) = 1024DiB
+	//1 Xero    Byte(XiB) = 1024CiB
 
-	var Bit = float64(len)
-	var KB = Bit / 1024
-	var MB = KB / 1024
-	var GB = MB / 1024
-	var TB = GB / 1024
-	var PB = TB / 1024
-	var EB = PB / 1024
-	var ZB = EB / 1024
-	var YB = ZB / 1024
-	var BB = YB / 1024
-	var NB = BB / 1024
-	var CB = NB / 1024
-	var XB = CB / 1024
-	if Bit < 1024 {
-		return fmt.Sprintf("%.0f", math.Floor(Bit*100)/100) + "B"
-	} else if KB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(KB*100)/100) + "KB"
-	} else if MB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(MB*100)/100) + "MB"
-	} else if GB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(GB*100)/100) + "GB"
-	} else if TB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(TB*100)/100) + "TB"
-	} else if PB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(PB*100)/100) + "PB"
-	} else if EB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(EB*100)/100) + "EB"
-	} else if ZB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(ZB*100)/100) + "ZB"
-	} else if YB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(YB*100)/100) + "YB"
-	} else if BB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(BB*100)/100) + "BB"
-	} else if NB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(NB*100)/100) + "NB"
-	} else if CB < 1024 {
-		return fmt.Sprintf("%.2f", math.Floor(CB*100)/100) + "CB"
+	var B = float64(len)
+	var KiB = B / 1024
+	var MiB = KiB / 1024
+	var GiB = MiB / 1024
+	var TiB = GiB / 1024
+	var PiB = TiB / 1024
+	var EiB = PiB / 1024
+	var ZiB = EiB / 1024
+	var YiB = ZiB / 1024
+	var BiB = YiB / 1024
+	var NiB = BiB / 1024
+	var CiB = NiB / 1024
+	var XiB = CiB / 1024
+	if B < 1024 {
+		return fmt.Sprintf("%.0f", math.Floor(B*100)/100) + "B"
+	} else if KiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(KiB*100)/100) + "KiB"
+	} else if MiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(MiB*100)/100) + "MiB"
+	} else if GiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(GiB*100)/100) + "GiB"
+	} else if TiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(TiB*100)/100) + "TiB"
+	} else if PiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(PiB*100)/100) + "PiB"
+	} else if EiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(EiB*100)/100) + "EiB"
+	} else if ZiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(ZiB*100)/100) + "ZiB"
+	} else if YiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(YiB*100)/100) + "YiB"
+	} else if BiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(BiB*100)/100) + "BiB"
+	} else if NiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(NiB*100)/100) + "NiB"
+	} else if CiB < 1024 {
+		return fmt.Sprintf("%.2f", math.Floor(CiB*100)/100) + "CiB"
 	} else {
-		return fmt.Sprintf("%.2f", math.Floor(XB*100)/100) + "XB"
+		return fmt.Sprintf("%.2f", math.Floor(XiB*100)/100) + "XiB"
 	}
 }
 

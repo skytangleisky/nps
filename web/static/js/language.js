@@ -165,61 +165,60 @@ function submitform(action, url, postdata) {
 }
 function changeunit(len) {
 	//1 Byte(B) = 8bit = 8b
-	//1 Kilo    Byte(KB) = 1024B
-	//1 Mega    Byte(MB) = 1024KB
-	//1 Giga    Byte(GB) = 1024MB
-	//1 Tera    Byte(TB) = 1024GB
-	//1 Peta    Byte(PB) = 1024TB
-	//1 Exa     Byte(EB) = 1024PB
-	//1 Zetta   Byte(ZB) = 1024EB
-	//1 Yotta   Byte(YB) = 1024ZB
-	//1 Bronto  Byte(BB) = 1024YB
-	//1 Nona    Byte(NB) = 1024BB
-	//1 Dogga   Byte(DB) = 1024NB
-	//1 Corydon Byte(CB) = 1024DB
-	//1 Xero    Byte(XB) = 1024CB
+	//1 Kilo    Byte(KiB) = 1024B
+	//1 Mega    Byte(MiB) = 1024KiB
+	//1 Giga    Byte(GiB) = 1024MiB
+	//1 Tera    Byte(TiB) = 1024GiB
+	//1 Peta    Byte(PiB) = 1024TiB
+	//1 Exa     Byte(EiB) = 1024PiB
+	//1 Zetta   Byte(ZiB) = 1024EiB
+	//1 Yotta   Byte(YiB) = 1024ZiB
+	//1 Bronto  Byte(BiB) = 1024YiB
+	//1 Nona    Byte(NiB) = 1024BiB
+	//1 Dogga   Byte(DiB) = 1024NiB
+	//1 Corydon Byte(CiB) = 1024DiB
+	//1 Xero    Byte(XiB) = 1024CiB
 
-	let Bit = len
-	let KB = Bit / 1024
-	let MB = KB / 1024
-	let GB = MB / 1024
-	let TB = GB / 1024
-	let PB = TB / 1024
-	let EB = PB / 1024
-	let ZB = EB / 1024
-	let YB = ZB / 1024
-	let BB = YB / 1024
-	let NB = BB / 1024
-	let CB = NB / 1024
-	let XB = CB / 1024
-	if (Bit < 1024) {
-		return Bit.toFixed(2) + "B"
-	} else if (KB < 1024) {
-		return KB.toFixed(2) + "KB"
-	} else if (MB < 1024) {
-		return MB.toFixed(2) + "MB"
-	} else if (GB < 1024) {
-		return GB.toFixed(2) + "GB"
-	} else if (TB < 1024) {
-		return TB.toFixed(2) + "TB"
-	} else if (PB < 1024) {
-		return PB.toFixed(2) + "PB"
-	} else if (EB < 1024) {
-		return EB.toFixed(2) + "EB"
-	} else if (ZB < 1024) {
-		return ZB.toFixed(2) + "ZB"
-	} else if (YB < 1024) {
-		return YB.toFixed(2) + "YB"
-	} else if (BB < 1024) {
-		return BB.toFixed(2) + "BB"
-	} else if (NB < 1024) {
-		return NB.toFixed(2) + "NB"
-	} else if (CB < 1024) {
-		return CB.toFixed(2) + "CB"
+	let B = len
+	let KiB = B / 1024
+	let MiB = KiB / 1024
+	let GiB = MiB / 1024
+	let TiB = GiB / 1024
+	let PiB = TiB / 1024
+	let EiB = PiB / 1024
+	let ZiB = EiB / 1024
+	let YiB = ZiB / 1024
+	let BiB = YiB / 1024
+	let NiB = BiB / 1024
+	let CiB = NiB / 1024
+	let XiB = CiB / 1024
+	if (B < 1024) {
+		return B.toFixed(2) + "B"
+	} else if (KiB < 1024) {
+		return KiB.toFixed(2) + "KiB"
+	} else if (MiB < 1024) {
+		return MiB.toFixed(2) + "MiB"
+	} else if (GiB < 1024) {
+		return GiB.toFixed(2) + "GiB"
+	} else if (TiB < 1024) {
+		return TiB.toFixed(2) + "TiB"
+	} else if (PiB < 1024) {
+		return PiB.toFixed(2) + "PiB"
+	} else if (EiB < 1024) {
+		return EiB.toFixed(2) + "EiB"
+	} else if (ZiB < 1024) {
+		return ZiB.toFixed(2) + "ZiB"
+	} else if (YiB < 1024) {
+		return YiB.toFixed(2) + "YiB"
+	} else if (BiB < 1024) {
+		return BiB.toFixed(2) + "BiB"
+	} else if (NiB < 1024) {
+		return NiB.toFixed(2) + "NiB"
+	} else if (CiB < 1024) {
+		return CiB.toFixed(2) + "CiB"
 	} else {
-		return XB.toFixed(2)+ "XB"
+		return XiB.toFixed(2) + "XiB"
 	}
-
 }
 // function changeunit(limit) {
 //     var size = "";
