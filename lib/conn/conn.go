@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/astaxie/beego/logs"
 	"io"
 	"net"
@@ -462,15 +463,30 @@ func GetConn(conn net.Conn, cpt, snappy bool, rt *rate.Rate, isServer bool) net.
 }
 
 type LenConn struct {
-	conn io.Writer
-	Len  int
+	net.Conn
+	WriteLen int64
+	ReadLen  int64
 }
 
-func NewLenConn(conn io.Writer) *LenConn {
-	return &LenConn{conn: conn}
-}
 func (c *LenConn) Write(p []byte) (n int, err error) {
-	n, err = c.conn.Write(p)
-	c.Len += n
+	n, err = c.Conn.Write(p)
+	c.WriteLen += int64(n)
 	return
+}
+
+func (c *LenConn) Read(p []byte) (n int, err error) {
+	n, err = c.Conn.Read(p)
+	c.ReadLen += int64(n)
+	return
+}
+
+func FormatMethod(method string) string {
+	switch method {
+	case "GET":
+		return fmt.Sprintf("\u001B[97;44m%*s\u001B[0m", 8, method)
+	case "POST":
+		return fmt.Sprintf("\u001B[97;46m%*s\u001B[0m", 8, method)
+	default:
+		return method
+	}
 }

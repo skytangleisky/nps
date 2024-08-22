@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -305,36 +306,63 @@ func (s *TRPClient) handleChan(src net.Conn) {
 			logs.Warn("connect to %s error %s", lk.Host, err.Error())
 			src.Close()
 		} else {
-			targetConn := conn.NewConn(c)
-			srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
-			if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
-				srcConn.Close()
-				targetConn.Close()
-				return
-			} else {
-				logs.Trace("new %s connection with the goal of %s, method %s, host %s, url %s, remote address %s", lk.ConnType, lk.Host, r.Method, r.Host, r.URL.Path, r.RemoteAddr)
-				r.Write(targetConn)
-			}
-			conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, targetConn.Rb)
-			//conn.CopyWaitGroup(srcConn, targetConn, lk.Crypt, lk.Compress, nil, nil, false, nil)//错误用法
-
+			//targetConn := conn.NewConn(c)
 			//srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
 			//if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
 			//	srcConn.Close()
 			//	targetConn.Close()
 			//	return
 			//} else {
-			//	logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, r.RemoteAddr)
+			//	logs.Trace("new %s connection with the goal of %s, method %s, host %s, url %s, remote address %s", lk.ConnType, lk.Host, r.Method, r.Host, r.URL.Path, r.RemoteAddr)
 			//	r.Write(targetConn)
 			//}
-			//go func() {
-			//	common.CopyBuffer(srcConn, targetConn)
-			//	srcConn.Close()
-			//	targetConn.Close()
-			//}()
-			//common.CopyBuffer(targetConn, srcConn)
-			//srcConn.Close()
-			//targetConn.Close()
+			//conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, targetConn.Rb)
+
+			targetConn := &conn.LenConn{Conn: c}
+			srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
+			r, err := http.ReadRequest(bufio.NewReader(srcConn))
+			if err != nil {
+				srcConn.Close()
+				targetConn.Close()
+				return
+			}
+			srcConn2 := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
+			if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Connection") == "Upgrade" {
+				r.Write(targetConn)
+				conn.CopyWaitGroup2(srcConn2, targetConn, nil)
+				parsedURL, _ := url.QueryUnescape(r.URL.String())
+				logs.Trace(strings.Join([]string{
+					fmt.Sprintf("\u001B[41m%*s\u001B[0m", 10, common.Changeunit(targetConn.WriteLen)) + fmt.Sprintf("\u001B[42m%*s\u001B[0m", 10, common.Changeunit(targetConn.ReadLen)) +
+						fmt.Sprintf("%s", conn.FormatMethod(r.Method)) +
+						fmt.Sprintf("\u001B[1;36m%s\u001B[0m", parsedURL),
+					fmt.Sprintf("host %s", r.Host),
+					fmt.Sprintf("%s->%s", targetConn.LocalAddr(), lk.Host),
+				}, ", "))
+			} else {
+				for {
+					r.Write(targetConn)
+					resp, err := http.ReadResponse(bufio.NewReader(targetConn), nil)
+					if err != nil {
+						srcConn2.Close()
+						targetConn.Close()
+						return
+					}
+					resp.Write(srcConn2)
+					parsedURL, _ := url.QueryUnescape(r.URL.String())
+					logs.Trace(strings.Join([]string{
+						fmt.Sprintf("\u001B[41m%*s\u001B[0m", 10, common.Changeunit(targetConn.WriteLen)) + fmt.Sprintf("\u001B[42m%*s\u001B[0m", 10, common.Changeunit(targetConn.ReadLen)) +
+							fmt.Sprintf("%s", conn.FormatMethod(r.Method)) +
+							fmt.Sprintf("\u001B[1;36m%s\u001B[0m", parsedURL),
+						fmt.Sprintf("host %s", r.Host),
+						fmt.Sprintf("%s->%s", targetConn.LocalAddr(), lk.Host),
+					}, ", "))
+					if r, err = http.ReadRequest(bufio.NewReader(srcConn2)); err != nil {
+						srcConn2.Close()
+						targetConn.Close()
+						return
+					}
+				}
+			}
 		}
 	} else if lk.ConnType == "udp5" {
 		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)

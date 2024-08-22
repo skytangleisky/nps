@@ -125,17 +125,17 @@ func (c *DebugController) Debug() {
 	clients[ws] = true
 	c.EnableRender = false //Beego不启用渲染
 	//go func() {
-	//	logs.Debug("\033[1;32mCONNECTED\033[0m", len(clients))
+	//	logs.Debug("\u001B[1;32mCONNECTED\u001B[0m", len(clients))
 	//	for {
 	//		_, d, err := ws.ReadMessage()
 	//		if err != nil {
 	//			//logs.Error(err.Error())
 	//			ws.Close()
 	//			delete(clients, ws) //删除map中的客户端
-	//			logs.Debug("\033[1;31mDISCONNECTED\033[0m",len(clients))
+	//			logs.Debug("\u001B[1;31mDISCONNECTED\u001B[0m",len(clients))
 	//			break //结束循环
 	//		} else {
-	//			logs.Debug("\033[1;34m\n"+bytes2str(d)+"\033[0m")//接受消息 业务逻辑
+	//			logs.Debug("\u001B[1;34m\n"+bytes2str(d)+"\u001B[0m")//接受消息 业务逻辑
 	//		}
 	//	}
 	//}()
@@ -175,72 +175,91 @@ func PrintMessage(b []byte) {
 
 func decodeANSI(strANSI string) []MyMessage {
 	var myMessages = make([]MyMessage, 0)
-	ss := "\033[0m" + strANSI
-	arrStr := regexp.MustCompile("\033\\[([0-9][;])?[1-9]?[0-9]m").Split(ss, -1)
-	colorStr := regexp.MustCompile("\033\\[([0-9][;])?[1-9]?[0-9]m").FindAllString(ss, -1)
+	ss := "\u001B[0m" + strANSI
+	arrStr := regexp.MustCompile("\u001B\\[([0-9]?[0-9][;])?[1-9]?[0-9]m").Split(ss, -1)
+	colorStr := regexp.MustCompile("\u001B\\[([0-9]?[0-9][;])?[1-9]?[0-9]m").FindAllString(ss, -1)
 	for i, value := range colorStr {
 		message := MyMessage{"", "2B2B2B", arrStr[i+1]}
 		//fmt.Println(value[1:])
 		switch value {
-		case "\033[0m":
+		case "\u001B[0m":
 			message.Color = "BBBBBB"
 			break
-		case "\033[1;34m":
+		case "\u001B[1;34m":
 			message.Color = "1FB0FF"
 			break
-		case "\033[1;37m":
+		case "\u001B[1;37m":
 			message.Color = "FFFFFF"
 			break
-		case "\033[1;36m":
+		case "\u001B[1;36m":
 			message.Color = "00E5E5"
 			break
-		case "\033[1;35m":
+		case "\u001B[1;35m":
 			message.Color = "ED7EED"
 			break
-		case "\033[1;31m":
+		case "\u001B[1;31m":
 			message.Color = "FF4050"
 			break
-		case "\033[1;33m":
+		case "\u001B[1;33m":
 			message.Color = "E5BF00"
 			break
-		case "\033[1;32m":
+		case "\u001B[1;32m":
 			message.Color = "4FC414"
 			break
-		case "\033[1;44m":
+		case "\u001B[1;44m":
 			message.Color = "FFFFFF"
 			message.Background = "1778BD"
 			break
-		case "\033[41m":
+		case "\u001B[41m":
 			message.Color = "FF4050"
 			message.Background = "772E2C"
 			break
-		case "\033[42m":
+		case "\u001B[42m":
 			message.Color = "4FC414"
 			message.Background = "458500"
 			break
-		case "\033[44m":
+		case "\u001B[44m":
 			message.Color = "1FB0FF"
 			message.Background = "1778BD"
 			break
-		case "\033[47m":
+		case "\u001B[47m":
 			message.Color = "808080"
 			message.Background = "616161"
 			break
-		case "\033[46m":
+		case "\u001B[46m":
 			message.Color = "00E5E5"
 			message.Background = "006E6E"
 			break
-		case "\033[43m":
+		case "\u001B[43m":
 			message.Color = "E5BF00"
 			message.Background = "A87B00"
 			break
-		case "\033[45m":
+		case "\u001B[45m":
 			message.Color = "ED7EED"
 			message.Background = "458500"
 			break
-
+		case "\u001B[97;42m":
+			message.Color = "FFFFFF"
+			message.Background = "39511F"
+			break
+		case "\u001B[97;43m":
+			message.Color = "FFFFFF"
+			message.Background = "5C4F17"
+			break
+		case "\u001B[97;44m":
+			message.Color = "FFFFFF"
+			message.Background = "245980"
+			break
+		case "\u001B[97;46m":
+			message.Color = "FFFFFF"
+			message.Background = "154F4F"
+			break
+		case "\u001B[90;47m":
+			message.Color = "808080"
+			message.Background = "616161"
+			break
 		default:
-			logs.Warn("未定义颜色：\\033" + value[1:])
+			logs.Warn("未定义颜色：\\u001B" + value[1:])
 		}
 		myMessages = append(myMessages, message)
 	}

@@ -3,7 +3,6 @@ package goroutine
 import (
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/file"
-	"github.com/astaxie/beego/logs"
 	"github.com/panjf2000/ants/v2"
 	"net"
 	"sync"
@@ -66,7 +65,7 @@ func copyConns(group interface{}) {
 	_ = connCopyPool.Invoke(newConnGroup(conns.conn2, conns.conn1, wg, &out))
 	// mux to outside : outgoing
 	wg.Wait()
-	logs.Warn(common.Changeunit(in), common.Changeunit(out), conns.conn1.LocalAddr(), conns.conn1.RemoteAddr(), conns.conn2.LocalAddr(), conns.conn2.RemoteAddr())
+	//logs.Warn(common.Changeunit(in), common.Changeunit(out), conns.conn1.LocalAddr(), conns.conn1.RemoteAddr(), conns.conn2.LocalAddr(), conns.conn2.RemoteAddr())
 	if conns.flow != nil {
 		conns.flow.Add(in, out)
 	}

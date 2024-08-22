@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"ehang.io/nps/bridge"
@@ -101,10 +104,9 @@ func (s *httpServer) Close() error {
 
 func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, scheme string) {
 	var (
-		host   *file.Host
-		target net.Conn
-		err    error
-		//scheme     = r.URL.Scheme
+		host       *file.Host
+		target     net.Conn
+		err        error
 		lk         *conn.Link
 		targetAddr string
 	)
@@ -133,29 +135,33 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 		http.Error(w, fmt.Sprintf("connect to target %s error, the client is not connected.", lk.Host), http.StatusOK)
 		return
 	}
+	defer target.Close()
 	//change the host and header and set proxy setting
 	common.ChangeHostAndHeader(r, host.HostChange, host.HeaderChange, r.RemoteAddr, s.addOrigin)
-	logs.Trace("%s request, method %s, host %s, url %s, remote address %s, target %s", r.URL.Scheme, r.Method, r.Host, r.URL.Path, r.RemoteAddr, lk.Host)
 
 	ctx := r.Context()
 	go func() {
 		<-ctx.Done()
 		target.Close()
 	}()
-	hijacker, ok := w.(http.Hijacker)
-	if ok {
-		c, _, err := hijacker.Hijack()
+	if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Connection") == "Upgrade" {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+			return
+		}
+		cc, _, err := hijacker.Hijack()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
+		c := &conn.LenConn{Conn: cc}
+		//https://go-review.googlesource.com/c/go/+/133416/1/src/net/http/server.go#1909
 		defer c.Close()
-		w = &connResponseWriter{
-			conn:   c,
-			header: make(http.Header),
-		}
+		w = NewConnResponseWriter(c)
+		bytes, _ := httputil.DumpRequest(r, true)
 		if host.Target.LocalProxy {
-			err = r.Write(target)
+			_, err = target.Write(bytes)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
@@ -163,9 +169,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			conn.CopyWaitGroup2(target, c, host.Flow)
 		} else {
-			//https://go-review.googlesource.com/c/go/+/133416/1/src/net/http/server.go#1909
 			targetConn := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
-			err = r.Write(targetConn)
+			_, err = targetConn.Write(bytes)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
@@ -173,18 +178,28 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			conn.CopyWaitGroup(target, c, lk.Crypt, lk.Compress, host.Client.Rate, host.Flow, true, nil)
 		}
+		parsedURL, _ := url.QueryUnescape(r.URL.String())
+		logs.Trace(strings.Join([]string{
+			fmt.Sprintf("\u001B[41m%*s\u001B[0m", 10, common.Changeunit(int64(len(bytes))+c.ReadLen)) + fmt.Sprintf("\u001B[42m%*s\u001B[0m", 10, common.Changeunit(c.WriteLen)) +
+				fmt.Sprintf("%s", conn.FormatMethod(r.Method)) +
+				fmt.Sprintf("\u001B[1;36m%s\u001B[0m", parsedURL),
+			fmt.Sprintf("host %s", r.Host),
+			fmt.Sprintf("%s->%s", r.RemoteAddr, lk.Host),
+		}, ", "))
 	} else {
+		var dim *conn.LenConn
+		bytes, _ := httputil.DumpRequest(r, true)
 		if host.Target.LocalProxy {
 			targetConn := rate.NewRateConn(target, host.Client.Rate)
 			defer targetConn.Close()
-			err = r.Write(targetConn)
+			_, err = targetConn.Write(bytes)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
 				return
 			}
-			targetReader := bufio.NewReader(targetConn)
-			resp, err := http.ReadResponse(targetReader, nil)
+			dim = &conn.LenConn{Conn: targetConn}
+			resp, err := http.ReadResponse(bufio.NewReader(dim), nil)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
@@ -197,13 +212,11 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 				}
 			}
 			w.WriteHeader(resp.StatusCode)
-			//io.Copy(w, resp.Body)
 			common.CopyBuffer(w, resp.Body)
 		} else {
-			defer target.Close()
 			targetConn := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
 			defer targetConn.Close()
-			err = r.Write(targetConn)
+			_, err = targetConn.Write(bytes)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to write request to target %s.", lk.Host), http.StatusOK)
@@ -211,8 +224,8 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			targetConn2 := conn.GetConn(target, lk.Crypt, lk.Compress, host.Client.Rate, true)
 			defer targetConn2.Close()
-			targetReader := bufio.NewReader(targetConn2)
-			resp, err := http.ReadResponse(targetReader, nil)
+			dim = &conn.LenConn{Conn: targetConn2}
+			resp, err := http.ReadResponse(bufio.NewReader(dim), nil)
 			if err != nil {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 				http.Error(w, fmt.Sprintf("Failed to read response from target %s.", lk.Host), http.StatusOK)
@@ -226,10 +239,16 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			}
 			w.WriteHeader(resp.StatusCode)
 			common.CopyBuffer(w, resp.Body)
-			//io.Copy(w, resp.Body)
 		}
+		parsedURL, _ := url.QueryUnescape(r.URL.String())
+		logs.Trace(strings.Join([]string{
+			fmt.Sprintf("\u001B[41m%*s\u001B[0m", 10, common.Changeunit(int64(len(bytes))+dim.WriteLen)) + fmt.Sprintf("\u001B[42m%*s\u001B[0m", 10, common.Changeunit(int64(len(bytes))+dim.ReadLen)) +
+				fmt.Sprintf("%s", conn.FormatMethod(r.Method)) +
+				fmt.Sprintf("\u001B[1;36m%s\u001B[0m", parsedURL),
+			fmt.Sprintf("host %s", r.Host),
+			fmt.Sprintf("%s->%s", r.RemoteAddr, lk.Host),
+		}, ", "))
 	}
-
 }
 
 func (s *httpServer) NewServer(port int, scheme string) *http.Server {
@@ -244,32 +263,39 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 	}
 }
 
-type connResponseWriter struct {
-	conn   net.Conn
+type ConnResponseWriter struct {
+	Conn   net.Conn
 	header http.Header
 	status int
 }
 
-func (w *connResponseWriter) Header() http.Header {
+func NewConnResponseWriter(conn net.Conn) *ConnResponseWriter {
+	return &ConnResponseWriter{
+		Conn:   conn,
+		header: make(http.Header),
+	}
+}
+
+func (w *ConnResponseWriter) Header() http.Header {
 	return w.header
 }
 
-func (w *connResponseWriter) Write(data []byte) (int, error) {
+func (w *ConnResponseWriter) Write(data []byte) (int, error) {
 	if w.status == 0 {
 		w.WriteHeader(http.StatusOK)
 	}
-	return w.conn.Write(data)
+	return w.Conn.Write(data)
 }
 
-func (w *connResponseWriter) WriteHeader(statusCode int) {
+func (w *ConnResponseWriter) WriteHeader(statusCode int) {
 	w.status = statusCode
 	statusLine := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, http.StatusText(statusCode))
-	w.conn.Write([]byte(statusLine))
+	w.Conn.Write([]byte(statusLine))
 	for key, values := range w.header {
 		for _, value := range values {
 			headerLine := fmt.Sprintf("%s: %s\r\n", key, value)
-			w.conn.Write([]byte(headerLine))
+			w.Conn.Write([]byte(headerLine))
 		}
 	}
-	w.conn.Write([]byte("\r\n"))
+	w.Conn.Write([]byte("\r\n"))
 }
