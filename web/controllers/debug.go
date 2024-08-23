@@ -192,7 +192,7 @@ func decodeANSI(strANSI string) []MyMessage {
 			message.Color = "FFFFFF"
 			break
 		case "\u001B[1;36m":
-			message.Color = "00E5E5"
+			message.Color = "00A3A3"
 			break
 		case "\u001B[1;35m":
 			message.Color = "ED7EED"
@@ -211,32 +211,32 @@ func decodeANSI(strANSI string) []MyMessage {
 			message.Background = "1778BD"
 			break
 		case "\u001B[41m":
-			message.Color = "FF4050"
+			message.Color = "F0524F"
 			message.Background = "772E2C"
 			break
 		case "\u001B[42m":
-			message.Color = "4FC414"
-			message.Background = "458500"
-			break
-		case "\u001B[44m":
-			message.Color = "1FB0FF"
-			message.Background = "1778BD"
-			break
-		case "\u001B[47m":
-			message.Color = "808080"
-			message.Background = "616161"
-			break
-		case "\u001B[46m":
-			message.Color = "00E5E5"
-			message.Background = "006E6E"
+			message.Color = "5C962C"
+			message.Background = "39511F"
 			break
 		case "\u001B[43m":
 			message.Color = "E5BF00"
 			message.Background = "A87B00"
 			break
+		case "\u001B[44m":
+			message.Color = "1FB0FF"
+			message.Background = "1778BD"
+			break
 		case "\u001B[45m":
 			message.Color = "ED7EED"
 			message.Background = "458500"
+			break
+		case "\u001B[46m":
+			message.Color = "00E5E5"
+			message.Background = "006E6E"
+			break
+		case "\u001B[47m":
+			message.Color = "808080"
+			message.Background = "616161"
 			break
 		case "\u001B[97;42m":
 			message.Color = "FFFFFF"
@@ -255,7 +255,7 @@ func decodeANSI(strANSI string) []MyMessage {
 			message.Background = "154F4F"
 			break
 		case "\u001B[90;47m":
-			message.Color = "808080"
+			message.Color = "595959"
 			message.Background = "616161"
 			break
 		default:
