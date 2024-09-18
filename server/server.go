@@ -2,6 +2,7 @@ package server
 
 import (
 	"ehang.io/nps/lib/version"
+	"encoding/json"
 	"errors"
 	"math"
 	"os"
@@ -443,6 +444,8 @@ func GetDashboardData() map[string]interface{} {
 			data["sys"+strconv.Itoa(i+1)] = tool.ServerStatus[i*fg]
 		}
 	}
+	jsonData, _ := json.MarshalIndent(data, "", "\t")
+	logs.Alert(string(jsonData))
 	return data
 }
 

@@ -342,12 +342,13 @@ func (s *TRPClient) handleChan(src net.Conn) {
 				for {
 					r.Write(targetConn)
 					resp, err := http.ReadResponse(bufio.NewReader(targetConn), nil)
-					if err != nil {
+					if err != nil || resp == nil {
 						srcConn2.Close()
 						targetConn.Close()
 						return
 					}
 					resp.Write(srcConn2)
+					resp.Body.Close()
 					parsedURL, _ := url.QueryUnescape(r.URL.String())
 					logs.Trace(strings.Join([]string{
 						fmt.Sprintf("\u001B[41m%*s\u001B[0m", 10, common.Changeunit(targetConn.WriteLen)) + fmt.Sprintf("\u001B[42m%*s\u001B[0m", 10, common.Changeunit(targetConn.ReadLen)) +
@@ -356,7 +357,7 @@ func (s *TRPClient) handleChan(src net.Conn) {
 						fmt.Sprintf("host %s", r.Host),
 						fmt.Sprintf("%s->%s", targetConn.LocalAddr(), lk.Host),
 					}, ", "))
-					if r, err = http.ReadRequest(bufio.NewReader(srcConn2)); err != nil {
+					if r, err = http.ReadRequest(bufio.NewReader(srcConn2)); err != nil || r == nil {
 						srcConn2.Close()
 						targetConn.Close()
 						return

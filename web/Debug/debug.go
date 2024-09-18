@@ -1,6 +1,7 @@
-package controllers
+package Debug
 
 import (
+	"encoding/json"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 	"github.com/gorilla/websocket"
@@ -88,7 +89,7 @@ type DebugController struct {
 var clients = make(map[*websocket.Conn]bool)
 
 // 广播频道(通道)
-var broadcast = make(chan []MyMessage)
+var broadcast = make(chan interface{}, 1000)
 
 // 配置升级程序(升级为websocket)
 var upgrader = websocket.Upgrader{}
@@ -139,6 +140,7 @@ func (c *DebugController) Debug() {
 	//		}
 	//	}
 	//}()
+	callback()
 	var myMessages = make([]MyMessage, 0)
 	myMessages = append(myMessages, MyMessage{"", "00ff00", "CONNECTED "})
 	myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(clients)) + "\n"})
@@ -149,26 +151,39 @@ func (c *DebugController) Debug() {
 			if err != nil {
 				//logs.Error(err.Error())
 				ws.Close()
-				delete(clients, ws) //删除map中的客户端
+				delete(clients, ws)
 				var myMessages = make([]MyMessage, 0)
 				myMessages = append(myMessages, MyMessage{"", "ff0000", "DISCONNECTED "})
 				myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(clients)) + "\n"})
 				broadcast <- myMessages
 				break //结束循环
 			} else {
-				if bytes2str(d) == "HEART" {
+				if string(d) == "HEART" {
 					continue
 				}
-				var myMessages = make([]MyMessage, 0)
-				myMessages = append(myMessages, MyMessage{"", "00ff00", bytes2str(d) + "\n"})
-				broadcast <- myMessages
+				msg := map[string]interface{}{}
+				err = json.Unmarshal(d, &msg)
+				if err == nil {
+					if msg["type"] == "获取nps数据" {
+						callback()
+					}
+				}
+				//var myMessages = make([]MyMessage, 0)
+				//myMessages = append(myMessages, MyMessage{"", "00ff00", string(d) + "\n"})
+				//broadcast <- myMessages
 			}
 		}
 	}()
+}
 
+var callback = func() {}
+
+func SetCallback(WsConnected func()) {
+	callback = WsConnected
 }
 func PrintMessage(b []byte) {
-	str := bytes2str(b)
+	//str := bytes2str(b)
+	str := string(b)
 	myMessages := decodeANSI(str)
 	broadcast <- myMessages
 }
@@ -273,26 +288,26 @@ func init() {
 		for {
 			//读取通道中的消息
 			msg := <-broadcast
-			for _, v := range msg {
-				l = append(l, v)
-			}
-			if len(l) > 500 {
-				l = l[len(l)-500:]
-			}
+			//for _, v := range msg {
+			//	l = append(l, v)
+			//}
+			//if len(l) > 500 {
+			//	l = l[len(l)-500:]
+			//}
 			for client := range clients {
 				//把通道中的消息发送给客户端
 				//fmt.Println("tanglei=", MyMessage{"FFff0000","abcdef\n"}.Color)
-				err := client.WriteJSON(l)
+				err := client.WriteJSON(msg)
 				//err:= client.WriteMessage(websocket.TextMessage,str2bytes(`[{"color":"ffff0000","message":"\n123456789\n"}]`))
 				if err != nil {
 					logs.Warn("client.WriteJSON error: %v", err)
-					client.Close()          //关闭
-					delete(clients, client) //删除map中的客户端
+					client.Close() //关闭
+					delete(clients, client)
 				}
 			}
-			if len(clients) > 0 {
-				l = l[:0:0]
-			}
+			//if len(clients) > 0 {
+			//	l = l[:0:0]
+			//}
 		}
 	}()
 }
@@ -310,4 +325,7 @@ func str2bytes(s string) []byte {
 
 func bytes2str(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
+}
+func Send(obj interface{}) {
+	broadcast <- obj
 }

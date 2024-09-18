@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"ehang.io/nps/web/Debug"
 	"ehang.io/nps/web/controllers"
 	"github.com/astaxie/beego"
 )
@@ -10,7 +11,7 @@ func Init() {
 	if len(web_base_url) > 0 {
 		ns := beego.NewNamespace(web_base_url,
 			beego.NSRouter("/", &controllers.IndexController{}, "*:Index"),
-			beego.NSRouter("/debug", &controllers.DebugController{}, "*:Debug"),
+			beego.NSRouter("/debug", &Debug.DebugController{}, "*:Debug"),
 			beego.NSAutoRouter(&controllers.IndexController{}),
 			beego.NSAutoRouter(&controllers.LoginController{}),
 			beego.NSAutoRouter(&controllers.ClientController{}),
@@ -19,7 +20,7 @@ func Init() {
 		beego.AddNamespace(ns)
 	} else {
 		beego.Router("/", &controllers.IndexController{}, "*:Index")
-		beego.Router("/debug", &controllers.DebugController{}, "*:Debug")
+		beego.Router("/debug", &Debug.DebugController{}, "*:Debug")
 		beego.AutoRouter(&controllers.IndexController{})
 		beego.AutoRouter(&controllers.LoginController{})
 		beego.AutoRouter(&controllers.ClientController{})

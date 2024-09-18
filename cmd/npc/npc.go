@@ -8,7 +8,7 @@ import (
 	"ehang.io/nps/lib/file"
 	"ehang.io/nps/lib/install"
 	"ehang.io/nps/lib/version"
-	"ehang.io/nps/web/controllers"
+	"ehang.io/nps/web/Debug"
 	"flag"
 	"fmt"
 	"github.com/astaxie/beego"
@@ -66,7 +66,7 @@ func main() {
 	//} else {
 	//	logs.SetLogger(controllers.PrintMessage,logs.AdapterFile, `{"level":`+*logLevel+`,"filename":"`+*logPath+`","daily":false,"maxlines":100000,"color":true}`)
 	//}
-	_ = logs.SetLogger(controllers.PrintMessage, logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
+	_ = logs.SetLogger(Debug.PrintMessage, logs.AdapterConsole, `{"level":`+*logLevel+`,"color":true}`)
 
 	// init service
 	options := make(service.KeyValue)
@@ -268,7 +268,7 @@ func run() {
 		}
 		go client.StartFromFile(*configPath)
 	}
-	beego.Router("/debug", &controllers.DebugController{}, "*:Debug")
+	beego.Router("/debug", &Debug.DebugController{}, "*:Debug")
 	if l, error := net.ListenTCP("tcp", &net.TCPAddr{net.ParseIP("0.0.0.0"), 7778, ""}); error == nil {
 		beego.InitBeforeHTTPRun()
 		er := http.Serve(l, beego.BeeApp.Handlers)

@@ -7,7 +7,7 @@ import (
 	"ehang.io/nps/server"
 	"ehang.io/nps/server/connection"
 	"ehang.io/nps/server/tool"
-	"ehang.io/nps/web/controllers"
+	"ehang.io/nps/web/Debug"
 	"ehang.io/nps/web/routers"
 	"flag"
 	"log"
@@ -76,7 +76,7 @@ func main() {
 	//} else {
 	//	//_ = logs.SetLogger(controllers.PrintMessage,logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
 	//}
-	_ = logs.SetLogger(controllers.PrintMessage, logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
+	_ = logs.SetLogger(Debug.PrintMessage, logs.AdapterConsole, `{"level":`+level+`,"color":true}`)
 	logs.Emergency("M")
 	logs.Alert("A")
 	logs.Critical("C")

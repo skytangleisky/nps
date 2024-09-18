@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"ehang.io/nps/lib/file"
 	"math"
 	"strconv"
 	"time"
@@ -55,7 +56,8 @@ func getSeverStatus() {
 		if len(ServerStatus) < 10 {
 			time.Sleep(time.Second)
 		} else {
-			time.Sleep(time.Minute)
+			//time.Sleep(time.Minute)
+			time.Sleep(time.Second)
 		}
 		cpuPercet, _ := cpu.Percent(0, true)
 		var cpuAll float64
@@ -64,6 +66,15 @@ func getSeverStatus() {
 		}
 		m := make(map[string]interface{})
 		loads, _ := load.Avg()
+		tcpCount := 0
+
+		file.GetDb().JsonDb.Clients.Range(func(key, value interface{}) bool {
+			tcpCount += int(value.(*file.Client).NowConn)
+			return true
+		})
+		//logs.Alert("tcpCount:", tcpCount)
+
+		m["tcp"] = tcpCount
 		m["load1"] = loads.Load1
 		m["load5"] = loads.Load5
 		m["load15"] = loads.Load15
@@ -86,9 +97,10 @@ func getSeverStatus() {
 		for _, v := range conn {
 			m[v.Protocol] = v.Stats["CurrEstab"]
 		}
-		if len(ServerStatus) >= 1440 {
+		if len(ServerStatus) >= 10 {
 			ServerStatus = ServerStatus[1:]
 		}
+		//Debug.Send(m)
 		ServerStatus = append(ServerStatus, m)
 	}
 }
