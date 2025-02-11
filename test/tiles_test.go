@@ -1,6 +1,8 @@
 package test
 
 import (
+	"fmt"
+	"github.com/astaxie/beego/logs"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"io"
@@ -19,7 +21,7 @@ func Test_tiles(t *testing.T) {
 	log.SetFlags(log.Llongfile | log.Lmicroseconds | log.Ldate)
 	var homeDir, _ = os.UserHomeDir()
 	var count int64 = 0
-	var process = func(w http.ResponseWriter, r *http.Request, rootDir string, tileUrl string, suffix string) {
+	var process = func(w http.ResponseWriter, r *http.Request, rootDir string, tileUrl string, suffix string, lyrs string) {
 		atomic.AddInt64(&count, 1)
 		value := atomic.LoadInt64(&count)
 		defer func() {
@@ -31,7 +33,6 @@ func Test_tiles(t *testing.T) {
 		z := query.Get("z")
 		y := query.Get("y")
 		x := query.Get("x")
-		lyrs := query.Get("lyrs")
 		var file = rootDir + lyrs + "/" + z + "/" + y + "/" + x + suffix
 		log.Print(value)
 		_, err := os.Stat(file)
@@ -51,18 +52,23 @@ func Test_tiles(t *testing.T) {
 			tmpUrl = strings.Replace(tmpUrl, "{lyrs}", lyrs, 1)
 			req, err := http.NewRequest("GET", tmpUrl, nil)
 			if err != nil {
-				panic(err)
+				logs.Error(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
 			resp, err := client.Do(req)
 			if err != nil {
-				panic(err)
+				logs.Error(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode == 200 {
 				imgBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
-					panic(err)
+					logs.Error(err)
+					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
 				_, err = os.Stat(rootDir + lyrs + "/" + z + "/" + y)
@@ -71,7 +77,9 @@ func Test_tiles(t *testing.T) {
 				}
 				err = os.WriteFile(file, imgBytes, 0644)
 				if err != nil {
-					panic(err)
+					logs.Error(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				log.Println(file)
 				http.ServeFile(w, r, file)
@@ -96,32 +104,46 @@ func Test_tiles(t *testing.T) {
 		var suffix string
 		switch r.Host {
 		case "tile.tanglei.site":
-			rootDir = homeDir + "/" + "maps/google/CN/"
+			rootDir = homeDir + "/" + "maps/google/US/"
 			urls := []string{
-				"https://mt0.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
-				"https://mt1.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
-				"https://mt2.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
-				"https://mt3.google.com/vt?gl=CN&lyrs={lyrs}&x={x}&y={y}&z={z}",
+				"https://mt0.google.com/vt?gl=US&lyrs={lyrs}&x={x}&y={y}&z={z}",
+				"https://mt1.google.com/vt?gl=US&lyrs={lyrs}&x={x}&y={y}&z={z}",
+				"https://mt2.google.com/vt?gl=US&lyrs={lyrs}&x={x}&y={y}&z={z}",
+				"https://mt3.google.com/vt?gl=US&lyrs={lyrs}&x={x}&y={y}&z={z}",
 			}
 			rd := rand.New(rand.NewSource(time.Now().UnixNano()))
 			tileUrl = urls[rd.Intn(4)]
 			suffix = ".jpg"
 			w.Header().Set("Content-Type", "image/jpeg")
-			process(w, r, rootDir, tileUrl, suffix)
+			query := r.URL.Query()
+			lyrs := query.Get("lyrs")
+			process(w, r, rootDir, tileUrl, suffix, lyrs)
 		case "terrain.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
 			tileUrl = "https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.webp?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".webp"
 			w.Header().Set("Content-Type", "image/webp")
-			process(w, r, rootDir, tileUrl, suffix)
+			process(w, r, rootDir, tileUrl, suffix, "terrain")
 		case "vector.tanglei.site":
 			rootDir = homeDir + "/" + "maps/mapbox/"
 			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".pbf"
 			w.Header().Set("Content-Type", "application/x-protobuf")
-			process(w, r, rootDir, tileUrl, suffix)
+			process(w, r, rootDir, tileUrl, suffix, "v")
+		case "dem.tanglei.site":
+			fmt.Println(r.Host)
+			rootDir = homeDir + "/" + "maps/mapbox/"
+			tileUrl = "https://a.tiles.mapbox.com/v4/mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
+			suffix = ".pbf"
+			w.Header().Set("Content-Type", "application/x-protobuf")
+			process(w, r, rootDir, tileUrl, suffix, "d")
 		default:
-			w.WriteHeader(http.StatusBadRequest)
+			//w.WriteHeader(http.StatusBadRequest)
+			rootDir = homeDir + "/" + "maps/mapbox/"
+			tileUrl = "https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.webp?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
+			suffix = ".webp"
+			w.Header().Set("Content-Type", "image/webp")
+			process(w, r, rootDir, tileUrl, suffix, "terrain")
 		}
 	})
 	go func() {
