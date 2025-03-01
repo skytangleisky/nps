@@ -86,7 +86,7 @@ type DebugController struct {
 }
 
 // 连接的客户端,把每个客户端都放进来
-var clients = make(map[*websocket.Conn]bool)
+var safeWebSocketSlice = SafeWebSocketSlice{}
 
 // 广播频道(通道)
 var broadcast = make(chan interface{}, 1000)
@@ -123,7 +123,7 @@ func (c *DebugController) Debug() {
 	//defer ws.Close()
 
 	//将当前客户端放入map中
-	clients[ws] = true
+	safeWebSocketSlice.Add(ws)
 	c.EnableRender = false //Beego不启用渲染
 	//go func() {
 	//	logs.Debug("\u001B[1;32mCONNECTED\u001B[0m", len(clients))
@@ -132,7 +132,7 @@ func (c *DebugController) Debug() {
 	//		if err != nil {
 	//			//logs.Error(err.Error())
 	//			ws.Close()
-	//			delete(clients, ws) //删除map中的客户端
+	//			safeWebSocketSlice.Remove(ws)//删除map中的客户端
 	//			logs.Debug("\u001B[1;31mDISCONNECTED\u001B[0m",len(clients))
 	//			break //结束循环
 	//		} else {
@@ -143,7 +143,7 @@ func (c *DebugController) Debug() {
 	callback()
 	var myMessages = make([]MyMessage, 0)
 	myMessages = append(myMessages, MyMessage{"", "00ff00", "CONNECTED "})
-	myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(clients)) + "\n"})
+	myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(safeWebSocketSlice.GetAll())) + "\n"})
 	broadcast <- myMessages
 	go func() {
 		for {
@@ -151,10 +151,10 @@ func (c *DebugController) Debug() {
 			if err != nil {
 				//logs.Error(err.Error())
 				ws.Close()
-				delete(clients, ws)
+				safeWebSocketSlice.Remove(ws)
 				var myMessages = make([]MyMessage, 0)
 				myMessages = append(myMessages, MyMessage{"", "ff0000", "DISCONNECTED "})
-				myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(clients)) + "\n"})
+				myMessages = append(myMessages, MyMessage{"", "bbbbbb", strconv.Itoa(len(safeWebSocketSlice.GetAll())) + "\n"})
 				broadcast <- myMessages
 				break //结束循环
 			} else {
@@ -294,7 +294,7 @@ func init() {
 			//if len(l) > 500 {
 			//	l = l[len(l)-500:]
 			//}
-			for client := range clients {
+			for _, client := range safeWebSocketSlice.GetAll() {
 				//把通道中的消息发送给客户端
 				//fmt.Println("tanglei=", MyMessage{"FFff0000","abcdef\n"}.Color)
 				err := client.WriteJSON(msg)
@@ -302,7 +302,7 @@ func init() {
 				if err != nil {
 					logs.Warn("client.WriteJSON error: %v", err)
 					client.Close() //关闭
-					delete(clients, client)
+					safeWebSocketSlice.Remove(client)
 				}
 			}
 			//if len(clients) > 0 {

@@ -80,7 +80,11 @@ func getSeverStatus() {
 		m["load15"] = loads.Load15
 		m["cpu"] = math.Round(cpuAll / float64(len(cpuPercet)))
 		swap, _ := mem.SwapMemory()
-		m["swap_mem"] = math.Round(swap.UsedPercent)
+		if swap == nil {
+			m["swap_mem"] = 0
+		} else {
+			m["swap_mem"] = math.Round(swap.UsedPercent)
+		}
 		vir, _ := mem.VirtualMemory()
 		m["virtual_mem"] = math.Round(vir.UsedPercent)
 		conn, _ := net.ProtoCounters(nil)
