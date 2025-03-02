@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"ehang.io/nps/bridge"
 	"ehang.io/nps/lib/common"
 	"ehang.io/nps/lib/conn"
@@ -11,8 +12,11 @@ import (
 	"github.com/astaxie/beego/logs"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type TunnelModeServer struct {
@@ -106,7 +110,7 @@ func ProcessTunnel(c *conn.Conn, s *TunnelModeServer) error {
 }
 
 // http proxy
-func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
+func ProcessHttp2(c *conn.Conn, s *TunnelModeServer) error {
 	_, addr, rb, err, r := c.GetHost()
 	if err != nil {
 		c.Close()
@@ -123,4 +127,53 @@ func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
 		return err
 	}
 	return s.DealClient(c, s.task.Client, addr, rb, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
+}
+
+// tanglei
+func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
+	defer c.Close()
+	r, err := http.ReadRequest(bufio.NewReader(c))
+	if err != nil {
+		logs.Error(err)
+		return err
+	}
+	if r.Header.Get("proxied") == "true" {
+		c.Write([]byte(common.ServiceUnavailableBytes))
+		logs.Error("Service Unavailable")
+		return errors.New("Service Unavailable")
+	}
+	r.Header.Set("proxied", "true")
+	var address string
+	hostPortURL, err := url.Parse(r.Host)
+	if err != nil {
+		address = r.Host
+	} else {
+		if hostPortURL.Opaque == "443" {
+			if strings.Index(r.Host, ":") == -1 {
+				address = r.Host + ":443"
+			} else {
+				address = r.Host
+			}
+		} else {
+			if strings.Index(r.Host, ":") == -1 {
+				address = r.Host + ":80"
+			} else {
+				address = r.Host
+			}
+		}
+	}
+	if err := s.auth(r, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
+		c.Write([]byte(common.UnauthorizedBytes))
+		return err
+	}
+	if r.Method == "CONNECT" {
+		c.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+		return s.DealClient(c, s.task.Client, address, nil, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
+	}
+	rb, err := httputil.DumpRequestOut(r, false)
+	if err != nil {
+		logs.Error(err)
+		return err
+	}
+	return s.DealClient(c, s.task.Client, address, rb, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
 }
