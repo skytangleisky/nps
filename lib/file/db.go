@@ -336,14 +336,7 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request, scheme string) (h 
 			v.Location = "/"
 		}
 		//tanglei
-		//if strings.Index(r.RequestURI, v.Location) == 0 {//http代理访问有问题
-		//if strings.Index(r.URL.Path, v.Location) == 0 {//https代理访问有问题
-		//if strings.Index(r.URL.Path, v.Location) == 0 || strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
-		//	if h == nil || (len(v.Location) > len(h.Location)) {
-		//		h = v
-		//	}
-		//}
-		if strings.Index(r.RequestURI, v.Location) == 0 { //支持代理和非代理访问我们的http服务
+		if (r.URL.Scheme == "http" && strings.Index(r.URL.Path, v.Location) == 0) || (r.URL.Scheme == "https" && strings.Index(r.RequestURI, v.Location) == 0) {
 			if h == nil || (len(v.Location) > len(h.Location)) {
 				h = v
 			}

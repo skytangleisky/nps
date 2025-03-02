@@ -274,7 +274,6 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 // http proxy connection
 func NewHttpProxyConn(url *url.URL, remoteAddr string) (net.Conn, error) {
 	req, err := http.NewRequest("CONNECT", "http://"+remoteAddr, nil)
-	logs.Error(remoteAddr)
 	if err != nil {
 		return nil, err
 	}
