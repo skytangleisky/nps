@@ -336,7 +336,7 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request, scheme string) (h 
 			v.Location = "/"
 		}
 		//tanglei
-		if (r.URL.Scheme == "http" && strings.Index(r.URL.Path, v.Location) == 0) || (r.URL.Scheme == "https" && strings.Index(r.RequestURI, v.Location) == 0) {
+		if strings.Index(r.URL.Path, v.Location) == 0 || strings.Index(r.RequestURI, v.Location) == 0 {
 			if h == nil || (len(v.Location) > len(h.Location)) {
 				h = v
 			}
