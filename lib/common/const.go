@@ -33,7 +33,6 @@ Content-Type: text/plain; charset=utf-8
 WWW-Authenticate: Basic realm="easyProxy"
 
 401 Unauthorized`
-	ConnectionFailBytes = `HTTP/1.1 404 Not Found
-
-`
+	ConnectionFailBytes     = `HTTP/1.1 404 Not Found`
+	ServiceUnavailableBytes = `HTTP/1.1 503 Service Unavailable`
 )

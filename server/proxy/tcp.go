@@ -117,6 +117,12 @@ func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
 	if r.Method == "CONNECT" {
 		c.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
 		rb = nil
+	} else {
+		c.Write([]byte(common.ServiceUnavailableBytes))
+		c.Close()
+		err = errors.New("not a valid http proxy protocol")
+		logs.Error(err)
+		return err
 	}
 	if err := s.auth(r, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
 		c.Write([]byte(common.UnauthorizedBytes))
