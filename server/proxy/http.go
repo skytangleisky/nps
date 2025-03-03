@@ -108,7 +108,7 @@ func (s *httpServer) Close() error {
 	return nil
 }
 
-func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, scheme string) {
+func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 	var (
 		host       *file.Host
 		target     net.Conn
@@ -116,7 +116,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 		lk         *conn.Link
 		targetAddr string
 	)
-	if host, err = file.GetDb().GetInfoByHost(r.Host, r, scheme); err != nil {
+	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
 		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
 		return
 	}
@@ -171,7 +171,11 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 			Debug.Send(map[string]interface{}{"tcp": atomic.LoadInt64(&TcpCount)})
 		}()
 		w = NewConnResponseWriter(c)
-		bytes, _ := httputil.DumpRequest(r, true)
+		bytes, err := httputil.DumpRequestOut(r, false)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
 		if host.Target.LocalProxy {
 			_, err = target.Write(bytes)
 			if err != nil {
@@ -202,7 +206,11 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 		var dim *conn.LenConn
 		r.ProtoMajor = 1
 		r.ProtoMinor = 1
-		bytes, _ := httputil.DumpRequest(r, true)
+		bytes, err := httputil.DumpRequestOut(r, false)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
 		if host.Target.LocalProxy {
 			targetConn := rate.NewRateConn(target, host.Client.Rate)
 			defer targetConn.Close()
@@ -265,7 +273,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request, sch
 	}
 }
 
-func (s *httpServer) handleTunneling1(w http.ResponseWriter, r *http.Request, scheme string) {
+func (s *httpServer) handleTunneling1(w http.ResponseWriter, r *http.Request) {
 	var (
 		host       *file.Host
 		target     net.Conn
@@ -273,7 +281,7 @@ func (s *httpServer) handleTunneling1(w http.ResponseWriter, r *http.Request, sc
 		lk         *conn.Link
 		targetAddr string
 	)
-	if host, err = file.GetDb().GetInfoByHost(r.Host, r, scheme); err != nil {
+	if host, err = file.GetDb().GetInfoByHost(r.Host, r); err != nil {
 		logs.Notice("the url %s %s %s can't be parsed!", r.URL.Scheme, r.Host, r.RequestURI)
 		return
 	}
@@ -424,8 +432,9 @@ func (s *httpServer) NewServer(port int, scheme string) *http.Server {
 			}
 		},
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			//r.URL.Scheme = scheme
-			s.handleTunneling(w, r, scheme)
+			r.URL.Scheme = scheme
+			r.URL.Host = r.Host
+			s.handleTunneling(w, r)
 		}),
 		// Disable HTTP/2.
 		//TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
