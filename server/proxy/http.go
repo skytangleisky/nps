@@ -171,7 +171,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 			Debug.Send(map[string]interface{}{"tcp": atomic.LoadInt64(&TcpCount)})
 		}()
 		w = NewConnResponseWriter(c)
-		bytes, err := httputil.DumpRequestOut(r, false)
+		bytes, err := httputil.DumpRequestOut(r, true)
 		if err != nil {
 			logs.Error(err)
 			return
@@ -206,7 +206,7 @@ func (s *httpServer) handleTunneling(w http.ResponseWriter, r *http.Request) {
 		var dim *conn.LenConn
 		r.ProtoMajor = 1
 		r.ProtoMinor = 1
-		bytes, err := httputil.DumpRequestOut(r, false)
+		bytes, err := httputil.DumpRequestOut(r, true)
 		if err != nil {
 			logs.Error(err)
 			return

@@ -131,22 +131,32 @@ func ProcessHttp2(c *conn.Conn, s *TunnelModeServer) error {
 
 // tanglei
 func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
-	defer c.Close()
 	r, err := http.ReadRequest(bufio.NewReader(c))
 	if err != nil {
 		logs.Error(err)
+		c.Close()
 		return err
 	}
+	ctx := r.Context()
+	go func() {
+		<-ctx.Done()
+		c.Close()
+	}()
+	logs.Alert("    r.Host----->", r.Host)
+	logs.Critical("r.URL.Host----->", r.URL.Host)
 	if r.Header.Get("proxied") == "true" {
 		c.Write([]byte(common.ServiceUnavailableBytes))
 		logs.Error("Service Unavailable")
+		c.Close()
 		return errors.New("Service Unavailable")
 	}
 	r.Header.Set("proxied", "true")
 	var address string
 	hostPortURL, err := url.Parse(r.Host)
 	if err != nil {
-		address = r.Host
+		logs.Error(err)
+		c.Close()
+		return err
 	} else {
 		if hostPortURL.Opaque == "443" {
 			if strings.Index(r.Host, ":") == -1 {
@@ -164,16 +174,18 @@ func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
 	}
 	if err := s.auth(r, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
 		c.Write([]byte(common.UnauthorizedBytes))
+		c.Close()
 		return err
 	}
 	if r.Method == "CONNECT" {
 		c.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
-		return s.DealClient(c, s.task.Client, address, nil, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
+		return s.DealClient(conn.NewConn(c), s.task.Client, address, nil, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
 	}
-	rb, err := httputil.DumpRequestOut(r, false)
+	rb, err := httputil.DumpRequestOut(r, true)
 	if err != nil {
+		c.Close()
 		logs.Error(err)
 		return err
 	}
-	return s.DealClient(c, s.task.Client, address, rb, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
+	return s.DealClient(conn.NewConn(c), s.task.Client, address, rb, common.CONN_TCP, nil, s.task.Flow, s.task.Target.LocalProxy)
 }
