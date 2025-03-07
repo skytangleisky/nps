@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-const PoolSize = 512 << 10
+const PoolSize = 64 * 1024
 const PoolSizeUdp = 1500 - 40 - 8
 
 var BufPoolUdp = sync.Pool{

@@ -72,5 +72,5 @@ func copyConns(group interface{}) {
 	conns.wg.Done()
 }
 
-var connCopyPool, _ = ants.NewPoolWithFunc(200000, copyConnGroup, ants.WithNonblocking(false))
-var CopyConnsPool, _ = ants.NewPoolWithFunc(100000, copyConns, ants.WithNonblocking(false))
+var connCopyPool, _ = ants.NewPoolWithFunc(200, copyConnGroup, ants.WithNonblocking(false))
+var CopyConnsPool, _ = ants.NewPoolWithFunc(100, copyConns, ants.WithNonblocking(false))

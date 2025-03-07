@@ -5,6 +5,7 @@ import (
 	"ehang.io/nps/lib/conn"
 	"ehang.io/nps/lib/file"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"github.com/astaxie/beego/logs"
 	"io"
@@ -62,11 +63,15 @@ func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 	*/
 	header := make([]byte, 3)
 
-	_, err := io.ReadFull(c, header)
-
+	n, err := c.Read(header)
 	if err != nil {
-		logs.Warn("illegal request", err)
-		c.Close()
+		logs.Warn("read header err", err)
+		_ = c.Close()
+		return
+	}
+	if n < 3 {
+		logs.Error("header is less than 3 bytes", hex.EncodeToString(header[:n]))
+		_ = c.Close()
 		return
 	}
 
@@ -79,7 +84,7 @@ func (s *Sock5ModeServer) handleRequest(c net.Conn) {
 		s.handleUDP(c)
 	default:
 		s.sendReply(c, "", commandNotSupported)
-		c.Close()
+		_ = c.Close()
 	}
 }
 
@@ -88,7 +93,12 @@ func (s *Sock5ModeServer) sendReply(c net.Conn, addr string, rep uint8) {
 	reply := []byte{5, rep, 0}
 	if addr != "" {
 		logs.Alert("====>", addr)
-		host, port, _ := net.SplitHostPort(addr)
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			logs.Error("failed to split host and port", err)
+			_ = c.Close()
+			return
+		}
 		ipBytes := net.ParseIP(host).To4()
 		if ipBytes != nil {
 			reply = append(reply, 1)
@@ -96,7 +106,12 @@ func (s *Sock5ModeServer) sendReply(c net.Conn, addr string, rep uint8) {
 			ipBytes = net.ParseIP(host).To16()
 			reply = append(reply, 4)
 		}
-		nPort, _ := strconv.Atoi(port)
+		nPort, err := strconv.Atoi(port)
+		if err != nil {
+			logs.Error("failed to convert port to int", err)
+			_ = c.Close()
+			return
+		}
 		reply = append(reply, ipBytes...)
 		portBytes := make([]byte, 2)
 		binary.BigEndian.PutUint16(portBytes, uint16(nPort))
@@ -104,36 +119,72 @@ func (s *Sock5ModeServer) sendReply(c net.Conn, addr string, rep uint8) {
 	} else {
 		reply[1] = networkUnreachable
 	}
-	c.Write(reply)
+	_, err := c.Write(reply)
+	if err != nil {
+		logs.Error("failed to send reply", hex.EncodeToString(reply))
+		_ = c.Close()
+		return
+	}
 }
 
 // do conn
 func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 	addrType := make([]byte, 1)
-	c.Read(addrType)
+	_, err := c.Read(addrType)
+	if err != nil {
+		logs.Error("failed to read addrType", err)
+		_ = c.Close()
+		return
+	}
 	var host string
 	switch addrType[0] {
 	case ipV4:
 		ipv4 := make(net.IP, net.IPv4len)
-		c.Read(ipv4)
+		_, err = c.Read(ipv4)
+		if err != nil {
+			logs.Error("failed to read ipv4", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv4.String()
 	case ipV6:
 		ipv6 := make(net.IP, net.IPv6len)
-		c.Read(ipv6)
+		_, err = c.Read(ipv6)
+		if err != nil {
+			logs.Error("failed to read ipv6", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv6.String()
 	case domainName:
 		var domainLen uint8
-		binary.Read(c, binary.BigEndian, &domainLen)
+		err = binary.Read(c, binary.BigEndian, &domainLen)
+		if err != nil {
+			logs.Error("failed to read domainLen", err)
+			_ = c.Close()
+			return
+		}
 		domain := make([]byte, domainLen)
-		c.Read(domain)
+		_, err = c.Read(domain)
+		if err != nil {
+			logs.Error("failed to read domain", err)
+			_ = c.Close()
+			return
+		}
 		host = string(domain)
 	default:
 		s.sendReply(c, "", addrTypeNotSupported)
+		_ = c.Close()
 		return
 	}
 
 	var port uint16
-	binary.Read(c, binary.BigEndian, &port)
+	err = binary.Read(c, binary.BigEndian, &port)
+	if err != nil {
+		logs.Error("failed to read port", err)
+		_ = c.Close()
+		return
+	}
 	// connect to host
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
 	var ltype string
@@ -142,9 +193,14 @@ func (s *Sock5ModeServer) doConnect(c net.Conn, command uint8) {
 	} else {
 		ltype = common.CONN_TCP
 	}
-	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, ltype, func(addr string) {
+	err = s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, ltype, func(addr string) {
 		s.sendReply(c, addr, succeeded)
 	}, s.task.Flow, s.task.Target.LocalProxy)
+	if err != nil {
+		logs.Error("DealClient failed", err)
+		_ = c.Close()
+		return
+	}
 	return
 }
 
@@ -161,7 +217,12 @@ func (s *Sock5ModeServer) handleBind(c net.Conn) {
 	_, err := c.Read(buffer)
 	if err != nil {
 		reply[1] = serverFailure
-		c.Write(reply)
+		_, err = c.Write(reply)
+		if err != nil {
+			logs.Error("failed to write reply", hex.EncodeToString(reply))
+			_ = c.Close()
+			return
+		}
 		return
 	}
 	addrType := buffer[0]
@@ -169,33 +230,73 @@ func (s *Sock5ModeServer) handleBind(c net.Conn) {
 	switch addrType {
 	case ipV4:
 		ipv4 := make(net.IP, net.IPv4len)
-		c.Read(ipv4)
+		_, err = c.Read(ipv4)
+		if err != nil {
+			logs.Error("failed to read ipv4", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv4.String()
 	case ipV6:
 		ipv6 := make(net.IP, net.IPv6len)
-		c.Read(ipv6)
+		_, err = c.Read(ipv6)
+		if err != nil {
+			logs.Error("failed to read ipv6", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv6.String()
 	case domainName:
 		var domainLen uint8
-		binary.Read(c, binary.BigEndian, &domainLen)
+		err = binary.Read(c, binary.BigEndian, &domainLen)
+		if err != nil {
+			logs.Error("failed to read domainLen", err)
+			_ = c.Close()
+			return
+		}
 		domain := make([]byte, domainLen)
-		c.Read(domain)
+		_, err = c.Read(domain)
+		if err != nil {
+			logs.Error("failed to read domain", err)
+			_ = c.Close()
+			return
+		}
 		host = string(domain)
 	default:
 		reply[1] = addrTypeNotSupported
-		c.Write(reply)
+		_, err = c.Write(reply)
+		if err != nil {
+			logs.Error("failed to write reply", hex.EncodeToString(reply))
+			_ = c.Close()
+			return
+		}
 		return
 	}
 	var port uint16
-	binary.Read(c, binary.BigEndian, &port)
+	err = binary.Read(c, binary.BigEndian, &port)
+	if err != nil {
+		logs.Error("failed to read port", err)
+		_ = c.Close()
+		return
+	}
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, common.CONN_BIND, func(addr string) {
+	err = s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, common.CONN_BIND, func(addr string) {
 		s.sendReply(c, addr, succeeded)
 	}, s.task.Flow, s.task.Target.LocalProxy)
+	if err != nil {
+		logs.Error("DealClient failed", err)
+		_ = c.Close()
+		return
+	}
 }
 func (s *Sock5ModeServer) sendUdpReply(writeConn net.Conn, c net.Conn, rep uint8, serverIp string) {
 	reply := []byte{5, rep, 0}
-	localHost, localPort, _ := net.SplitHostPort(c.LocalAddr().String())
+	localHost, localPort, err := net.SplitHostPort(c.LocalAddr().String())
+	if err != nil {
+		logs.Error("failed to string local address", err)
+		_ = c.Close()
+		return
+	}
 	localHost = serverIp
 	ipBytes := net.ParseIP(localHost).To4()
 	if ipBytes != nil {
@@ -209,29 +310,57 @@ func (s *Sock5ModeServer) sendUdpReply(writeConn net.Conn, c net.Conn, rep uint8
 	portBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(portBytes, uint16(nPort))
 	reply = append(reply, portBytes...)
-	writeConn.Write(reply)
-
+	_, err = writeConn.Write(reply)
+	if err != nil {
+		logs.Error("failed to write reply", hex.EncodeToString(reply))
+		_ = c.Close()
+		return
+	}
 }
 
 func (s *Sock5ModeServer) handleUDP(c net.Conn) {
-	defer c.Close()
 	addrType := make([]byte, 1)
-	c.Read(addrType)
+	_, err := c.Read(addrType)
+	if err != nil {
+		logs.Error("failed to read addrType", hex.EncodeToString(addrType))
+		_ = c.Close()
+		return
+	}
 	var host string
 	switch addrType[0] {
 	case ipV4:
 		ipv4 := make(net.IP, net.IPv4len)
-		c.Read(ipv4)
+		_, err = c.Read(ipv4)
+		if err != nil {
+			logs.Error("failed to read ipv4", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv4.String()
 	case ipV6:
 		ipv6 := make(net.IP, net.IPv6len)
-		c.Read(ipv6)
+		_, err = c.Read(ipv6)
+		if err != nil {
+			logs.Error("failed to read ipv6", err)
+			_ = c.Close()
+			return
+		}
 		host = ipv6.String()
 	case domainName:
 		var domainLen uint8
-		binary.Read(c, binary.BigEndian, &domainLen)
+		err = binary.Read(c, binary.BigEndian, &domainLen)
+		if err != nil {
+			logs.Error("failed to read domainLen", err)
+			_ = c.Close()
+			return
+		}
 		domain := make([]byte, domainLen)
-		c.Read(domain)
+		_, err = c.Read(domain)
+		if err != nil {
+			logs.Error("failed to read domain", err)
+			_ = c.Close()
+			return
+		}
 		host = string(domain)
 	default:
 		s.sendReply(c, "", addrTypeNotSupported)
@@ -239,8 +368,13 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 	}
 	//读取端口
 	var port uint16
-	binary.Read(c, binary.BigEndian, &port)
-	logs.Warn(host, string(port))
+	err = binary.Read(c, binary.BigEndian, &port)
+	if err != nil {
+		logs.Error("failed to read port", err)
+		_ = c.Close()
+		return
+	}
+	logs.Warn(host, strconv.Itoa(int(port)))
 	replyAddr, err := net.ResolveUDPAddr("udp", s.task.ServerIp+":0")
 	if err != nil {
 		logs.Error("build local reply addr error", err)
@@ -254,7 +388,9 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 	}
 	// reply the local addr
 	s.sendUdpReply(c, reply, succeeded, common.GetServerIpByClientIp(c.RemoteAddr().(*net.TCPAddr).IP))
-	defer reply.Close()
+	defer func() {
+		_ = reply.Close()
+	}()
 	// new a tunnel to client
 	link := conn.NewLink("udp5", "", s.task.Client.Cnf.Crypt, s.task.Client.Cnf.Compress, c.RemoteAddr().String(), false)
 	target, err := s.bridge.SendLinkInfo(s.task.Client.Id, link, s.task)
@@ -268,7 +404,9 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 	go func() {
 		b := common.BufPoolUdp.Get().([]byte)
 		defer common.BufPoolUdp.Put(b)
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
 
 		for {
 			n, laddr, err := reply.ReadFrom(b)
@@ -290,15 +428,17 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 		var l int32
 		b := common.BufPoolUdp.Get().([]byte)
 		defer common.BufPoolUdp.Put(b)
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
 		for {
 			if err := binary.Read(target, binary.LittleEndian, &l); err != nil || l >= common.PoolSizeUdp || l <= 0 {
 				logs.Warn("read len bytes error", err.Error())
 				return
 			}
-			binary.Read(target, binary.LittleEndian, b[:l])
+			err = binary.Read(target, binary.LittleEndian, b[:l])
 			if err != nil {
-				logs.Warn("read data form client error", err.Error())
+				logs.Warn("read data form target error", err.Error())
 				return
 			}
 			if _, err := reply.WriteTo(b[:l], clientAddr); err != nil {
@@ -310,11 +450,13 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 
 	b := common.BufPoolUdp.Get().([]byte)
 	defer common.BufPoolUdp.Put(b)
-	defer target.Close()
+	defer func() {
+		_ = target.Close()
+	}()
 	for {
 		_, err := c.Read(b)
 		if err != nil {
-			c.Close()
+			_ = c.Close()
 			return
 		}
 	}
@@ -323,36 +465,52 @@ func (s *Sock5ModeServer) handleUDP(c net.Conn) {
 // new conn
 func (s *Sock5ModeServer) handleConn(c net.Conn) {
 	buf := make([]byte, 2)
-	if _, err := io.ReadFull(c, buf); err != nil {
+	n, err := c.Read(buf)
+	if err != nil {
 		logs.Warn("negotiation err", err)
-		c.Close()
+		_ = c.Close()
+		return
+	}
+	if n < 2 {
+		logs.Error("negotiation is less than 2 bytes", hex.EncodeToString(buf[:n]))
+		_ = c.Close()
 		return
 	}
 
 	if version := buf[0]; version != 5 {
 		logs.Warn("only support socks5, request from: ", c.RemoteAddr())
-		c.Close()
+		_ = c.Close()
 		return
 	}
 	nMethods := buf[1]
 
 	methods := make([]byte, nMethods)
-	if len, err := c.Read(methods); len != int(nMethods) || err != nil {
+	if length, err := c.Read(methods); length != int(nMethods) || err != nil {
 		logs.Warn("wrong method")
-		c.Close()
+		_ = c.Close()
 		return
 	}
 	if (s.task.Client.Cnf.U != "" && s.task.Client.Cnf.P != "") || (s.task.MultiAccount != nil && len(s.task.MultiAccount.AccountMap) > 0) {
 		buf[1] = UserPassAuth
-		c.Write(buf)
+		_, err := c.Write(buf)
+		if err != nil {
+			logs.Error("failed to write UserPassAuth", hex.EncodeToString(buf))
+			_ = c.Close()
+			return
+		}
 		if err := s.Auth(c); err != nil {
-			c.Close()
+			_ = c.Close()
 			logs.Warn("Validation failed:", err)
 			return
 		}
 	} else {
 		buf[1] = 0
-		c.Write(buf)
+		_, err := c.Write(buf)
+		if err != nil {
+			logs.Error("failed to write UserPassAuth passed", hex.EncodeToString(buf))
+			_ = c.Close()
+			return
+		}
 	}
 	s.handleRequest(c)
 }
@@ -412,7 +570,7 @@ func (s *Sock5ModeServer) Start() error {
 	return conn.NewTcpListenerAndProcess(s.task.ServerIp+":"+strconv.Itoa(s.task.Port), func(c net.Conn) {
 		if err := s.CheckFlowAndConnNum(s.task.Client); err != nil {
 			logs.Warn("client id %d, task id %d, error %s, when socks5 connection", s.task.Client.Id, s.task.Id, err.Error())
-			c.Close()
+			_ = c.Close()
 			return
 		}
 		logs.Trace("New socks5 connection,client %d,remote address %s", s.task.Client.Id, c.RemoteAddr())

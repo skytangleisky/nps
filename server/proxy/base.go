@@ -87,7 +87,7 @@ func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, 
 	link := conn.NewLink(tp, addr, client.Cnf.Crypt, client.Cnf.Compress, c.Conn.RemoteAddr().String(), localProxy)
 	if target, err := s.bridge.SendLinkInfo(client.Id, link, s.task); err != nil {
 		logs.Warn("get connection from client id %d  error %s", client.Id, err.Error())
-		c.Close()
+		_ = c.Close()
 		return err
 	} else {
 		//if localProxy {
@@ -106,11 +106,12 @@ func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, 
 		//	}
 		//	conn.CopyWaitGroup2(target, c.Conn, flow)
 		//} else {
-		buffer := make([]byte, 1024)
+		buffer := common.BufPool.Get().([]byte)
+		defer common.BufPool.Put(buffer)
 		connHandle := conn.GetConn(target, link.Crypt, link.Compress, client.Rate, true)
 		n, err := connHandle.Read(buffer)
 		if err != nil {
-			c.Close()
+			_ = c.Close()
 			return err
 		}
 		addr := buffer[:n]
@@ -118,7 +119,11 @@ func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string, 
 			f(string(addr))
 		}
 		if rb != nil {
-			connHandle.Write(rb)
+			_, err = connHandle.Write(rb)
+			if err != nil {
+				logs.Error("failed to write rb", string(rb))
+				return err
+			}
 		}
 		conn.CopyWaitGroup2(connHandle, c.Conn, flow)
 		//}
