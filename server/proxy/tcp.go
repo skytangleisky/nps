@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -148,29 +147,18 @@ func ProcessHttp(c *conn.Conn, s *TunnelModeServer) error {
 		c.Write([]byte(common.ServiceUnavailableBytes))
 		logs.Error("Service Unavailable")
 		c.Close()
-		return errors.New("Service Unavailable")
+		return errors.New("service Unavailable")
 	}
 	r.Header.Set("proxied", "true")
 	var address string
-	hostPortURL, err := url.Parse(r.Host)
-	if err != nil {
-		logs.Error(err)
-		c.Close()
-		return err
-	} else {
-		if hostPortURL.Opaque == "443" {
-			if strings.Index(r.Host, ":") == -1 {
-				address = r.Host + ":443"
-			} else {
-				address = r.Host
-			}
+	if strings.Index(r.Host, ":") == -1 {
+		if r.URL.Scheme == "http" {
+			address = r.Host + ":80"
 		} else {
-			if strings.Index(r.Host, ":") == -1 {
-				address = r.Host + ":80"
-			} else {
-				address = r.Host
-			}
+			address = r.Host + ":443"
 		}
+	} else {
+		address = r.Host
 	}
 	if err := s.auth(r, s.task.Client.Cnf.U, s.task.Client.Cnf.P); err != nil {
 		c.Write([]byte(common.UnauthorizedBytes))
