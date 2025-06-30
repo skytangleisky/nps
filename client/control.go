@@ -227,8 +227,10 @@ func NewConn(tp string, vkey string, server string, connType string, proxyUrl st
 	}
 	connection.SetDeadline(time.Now().Add(time.Second * 10))
 	defer connection.SetDeadline(time.Time{})
+	prefix := make([]byte, 4)
+	rand.Read(prefix)
 	c := conn.NewConn(connection)
-	if _, err := c.Write([]byte(common.CONN_TEST)); err != nil {
+	if _, err := c.Write(prefix); err != nil {
 		c.Close()
 		return nil, err
 	}
