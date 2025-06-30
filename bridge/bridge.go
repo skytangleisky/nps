@@ -1,10 +1,10 @@
 package bridge
 
 import (
-	"ehang.io/nps/smux"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/xtaci/smux"
 	"net"
 	"os"
 	"strconv"

@@ -31,7 +31,7 @@ var (
 	verifyKey      = flag.String("vkey", "", "Authentication key")
 	logType        = flag.String("log", "stdout", "Log output mode（stdout|file）")
 	connType       = flag.String("type", "tcp", "Connection type with the server（kcp|tcp）")
-	proxyUrl       = flag.String("proxy", "socks5://tanglei.top:5555", "proxy socks5 url(eg:socks5://111:222@127.0.0.1:9007)")
+	proxyUrl       = flag.String("proxy", "", "proxy socks5 url(eg:socks5://111:222@127.0.0.1:9007)")
 	logLevel       = flag.String("log_level", "7", "log level 0~7")
 	registerTime   = flag.Int("time", 2, "register time long /h")
 	localPort      = flag.Int("local_port", 2000, "p2p local port")

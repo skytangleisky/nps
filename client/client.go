@@ -3,9 +3,9 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"ehang.io/nps/smux"
 	"encoding/binary"
 	"fmt"
+	"github.com/xtaci/smux"
 	"net"
 	"net/http"
 	"net/url"
@@ -79,15 +79,16 @@ retry:
 	//monitor the connection
 	go s.ping2()
 	s.signal = c
-	//start a channel connection
-	go s.newChan() //tanglei
 	//start health check if it's open
 	if s.cnf != nil && len(s.cnf.Healths) > 0 {
 		go healthCheck(s.cnf.Healths, s.signal)
 	}
 	NowStatus = 1
 	//msg connection, eg udp
-	s.handleMain()
+	go s.handleMain()
+
+	//start a channel connection
+	s.newChan() //tanglei
 }
 
 // handle main connection
@@ -248,7 +249,7 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 			//})
 			session, _ := smux.Server(udpTunnel, nil)
 			for {
-				c, err := session.Accept()
+				c, err := session.AcceptStream()
 				if err != nil {
 					if strings.Contains(err.Error(), "use of closed network connection") {
 						break
@@ -281,7 +282,7 @@ func (s *TRPClient) newChan() {
 	//s.tunnel = nps_mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime)
 	s.tunnel, _ = smux.Server(tunnel.Conn, nil)
 	for {
-		src, err := s.tunnel.Accept()
+		src, err := s.tunnel.AcceptStream()
 		if err != nil {
 			logs.Error(err.Error(), tunnel.Conn.LocalAddr())
 			s.Close()

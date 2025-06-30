@@ -1,8 +1,8 @@
 package client
 
 import (
-	"ehang.io/nps/smux"
 	"errors"
+	"github.com/xtaci/smux"
 	"net"
 	"net/http"
 	"runtime"

@@ -2,9 +2,9 @@ package kcp
 
 import (
 	"ehang.io/nps/lib/common"
-	"ehang.io/nps/smux"
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go/v5"
+	"github.com/xtaci/smux"
 	"log"
 	"math/rand"
 	"net"
@@ -131,7 +131,7 @@ func Test_KMS(t *testing.T) {
 			//conn.SetUdpSession(kcpConn)
 			//muxSession := nps_mux.NewMux(conn, "tcp", 0)
 			muxSession, _ := smux.Client(conn, nil)
-			peer, _ := muxSession.Accept()
+			peer, _ := muxSession.AcceptStream()
 			go func(conn net.Conn) {
 				ipStr := conn.RemoteAddr().String()
 				defer func() {

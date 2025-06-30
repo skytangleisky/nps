@@ -21,7 +21,7 @@ require (
 require (
 	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/hooklift/assert v0.0.0-20170704181755-9d1defd6d214 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
 	github.com/klauspost/pgzip v1.2.1 // indirect
@@ -29,6 +29,7 @@ require (
 	github.com/miekg/dns v1.1.59
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/tjfoc/gmsm v1.4.0 // indirect
+	github.com/xtaci/smux v1.5.34 // indirect
 	golang.org/x/tools v0.21.0 // indirect
 )
 

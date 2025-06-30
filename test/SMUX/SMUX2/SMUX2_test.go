@@ -2,9 +2,9 @@ package SMUX2
 
 import (
 	"ehang.io/nps/lib/common"
-	"ehang.io/nps/smux"
 	"github.com/astaxie/beego/logs"
 	"github.com/xtaci/kcp-go/v5"
+	"github.com/xtaci/smux"
 	"log"
 	"math/rand"
 	"net"
