@@ -1,0 +1,9 @@
+{
+  "addr": ":3142",
+  "rootDir": "~/maps/影像",
+  "contentType":"image/jpeg",
+  "suffix": ".jpg",
+  "tileUrls": [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}/"
+  ]
+}

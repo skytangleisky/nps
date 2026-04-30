@@ -18,6 +18,11 @@ import (
 )
 
 func Test_tiles(t *testing.T) {
+	uProxy, _ := url.Parse("http://127.0.0.1:7890")
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(uProxy),
+		//Proxy: nil,
+	}
 	log.SetFlags(log.Llongfile | log.Lmicroseconds | log.Ldate)
 	var homeDir, _ = os.UserHomeDir()
 	var count int64 = 0
@@ -37,19 +42,14 @@ func Test_tiles(t *testing.T) {
 		log.Print(value)
 		_, err := os.Stat(file)
 		if err != nil {
-			uProxy, _ := url.Parse("http://127.0.0.1:7890")
-			transport := &http.Transport{
-				Proxy: http.ProxyURL(uProxy),
-				//Proxy: nil,
-			}
 			client := &http.Client{
 				Transport: transport,
 			}
 			var tmpUrl = tileUrl
-			tmpUrl = strings.Replace(tmpUrl, "{x}", x, 1)
-			tmpUrl = strings.Replace(tmpUrl, "{y}", y, 1)
-			tmpUrl = strings.Replace(tmpUrl, "{z}", z, 1)
-			tmpUrl = strings.Replace(tmpUrl, "{lyrs}", lyrs, 1)
+			tmpUrl = strings.Replace(tmpUrl, "{x}", x, -1)
+			tmpUrl = strings.Replace(tmpUrl, "{y}", y, -1)
+			tmpUrl = strings.Replace(tmpUrl, "{z}", z, -1)
+			tmpUrl = strings.Replace(tmpUrl, "{lyrs}", lyrs, -1)
 			req, err := http.NewRequest("GET", tmpUrl, nil)
 			if err != nil {
 				logs.Error(err)
@@ -98,12 +98,13 @@ func Test_tiles(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
+		//fmt.Println(r.Host)
 		var rootDir string
 		var tileUrl string
 		var suffix string
 		switch r.Host {
-		case "tile.tanglei.site":
+		//case "tile.tanglei.site":
+		case "127.0.0.1:3241":
 			rootDir = homeDir + "/" + "maps/google/US/"
 			urls := []string{
 				"https://mt0.google.com/vt?gl=US&lyrs={lyrs}&x={x}&y={y}&z={z}",
@@ -124,7 +125,7 @@ func Test_tiles(t *testing.T) {
 			suffix = ".webp"
 			w.Header().Set("Content-Type", "image/webp")
 			process(w, r, rootDir, tileUrl, suffix, "terrain")
-		case "vector.tanglei.site":
+		case "vector.tanglei.site:3241":
 			rootDir = homeDir + "/" + "maps/mapbox/"
 			tileUrl = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8,mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=101tGqRwUCYc3&access_token=pk.eyJ1IjoidGFuZ2xlaTIwMTMxNCIsImEiOiJjbGtmOTdyNWoxY2F1M3Jqczk4cGllYXp3In0.9N-H_79ehy4dJeuykZa0xA"
 			suffix = ".pbf"

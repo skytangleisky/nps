@@ -1,0 +1,11 @@
+{
+  "addr": ":3140",
+  "rootDir": "~/maps/道路",
+  "contentType":"image/jpeg",
+  "contentTypes":["image/jpeg","image/png","application/x-protobuf","application/octet-stream"],
+  "suffix": ".jpg",
+  "proxy": "http://172.18.7.38:4444",
+  "tileUrls": [
+    "http://10.225.6.188:3141/xbry/maps/DataServer?T=cia_w&tk=b5c6d22f3ea7a78d2526bcc2552882ef&x={x}&y={y}&l={z}"
+  ]
+}

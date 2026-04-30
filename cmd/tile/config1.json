@@ -1,0 +1,9 @@
+{
+  "addr": ":3141",
+  "rootDir": "~/maps/矢量",
+  "contentType":"image/jpeg",
+  "suffix": ".jpg",
+  "tileUrls": [
+    "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/WMTS/tile/1.0.0/Canvas_World_Dark_Gray_Base/default/default028mm/{z}/{y}/{x}/"
+  ]
+}
