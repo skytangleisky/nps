@@ -1,9 +1,0 @@
-{
-  "addr": ":3144",
-  "rootDir": "~/maps/航线",
-  "contentType":"image/jpeg",
-  "suffix": ".jpg",
-  "tileUrls": [
-    "http://127.0.0.1:3000/backend/image?x={x}&y={y}&z={z}&strokeColor=rgba(0,255,255,1)&fillColor=rgba(0,255,255,0.2)&textColor=rgba(0,255,255,1)"
-  ]
-}

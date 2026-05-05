@@ -1,11 +1,64 @@
-{
-  "addr": ":3140",
-  "rootDir": "~/maps/道路",
-  "contentType":"image/jpeg",
-  "contentTypes":["image/jpeg","image/png","application/x-protobuf","application/octet-stream"],
-  "suffix": ".jpg",
-  "proxy": "http://172.18.7.38:4444",
-  "tileUrls": [
-    "http://10.225.6.188:3141/xbry/maps/DataServer?T=cia_w&tk=b5c6d22f3ea7a78d2526bcc2552882ef&x={x}&y={y}&l={z}"
-  ]
-}
+[
+  {
+    "addr": ":3140",
+    "rootDir": "~/maps/道路",
+    "contentType":"image/jpeg",
+    "contentTypes":["image/jpeg","image/png","application/x-protobuf","application/octet-stream"],
+    "suffix": ".jpg",
+    "proxy": "http://172.18.7.38:4444",
+    "tileUrls": [
+      "http://10.225.6.188:3141/xbry/maps/DataServer?T=cia_w&tk=b5c6d22f3ea7a78d2526bcc2552882ef&x={x}&y={y}&l={z}"
+    ]
+  },
+  {
+    "addr": ":3141",
+    "rootDir": "~/maps/矢量",
+    "contentType":"image/jpeg",
+    "suffix": ".jpg",
+    "proxy": "http://127.0.0.1:7890",
+    "tileUrls": [
+      "https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/WMTS/tile/1.0.0/Canvas_World_Dark_Gray_Base/default/default028mm/{z}/{y}/{x}/"
+    ]
+  },
+  {
+    "addr": ":3142",
+    "rootDir": "~/maps/google/US/s",
+    "contentType":"image/jpeg",
+    "suffix": ".jpg",
+    "proxy": "http://127.0.0.1:7890",
+    "tileUrls": [
+      "https://mt0.google.com/vt?gl=US&lyrs=s&x={x}&y={y}&z={z}",
+      "https://mt1.google.com/vt?gl=US&lyrs=s&x={x}&y={y}&z={z}",
+      "https://mt2.google.com/vt?gl=US&lyrs=s&x={x}&y={y}&z={z}",
+      "https://mt3.google.com/vt?gl=US&lyrs=s&x={x}&y={y}&z={z}"
+    ]
+  },
+  {
+    "addr": ":3142",
+    "rootDir": "~/maps/影像",
+    "contentType":"image/jpeg",
+    "suffix": ".jpg",
+    "tileUrls": [
+      "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}/"
+    ],
+    "disabled": true
+  },
+  {
+    "addr": ":3143",
+    "rootDir": "~/maps/地形",
+    "contentType":"image/jpeg",
+    "suffix": ".jpg",
+    "tileUrls": [
+      "https://maps-for-free.com/layer/relief/z{z}/row{y}/{z}_{x}-{y}.jpg"
+    ]
+  },
+  {
+    "addr": ":3144",
+    "rootDir": "~/maps/航线",
+    "contentType":"image/jpeg",
+    "suffix": ".jpg",
+    "tileUrls": [
+      "http://127.0.0.1:3000/backend/image?x={x}&y={y}&z={z}&strokeColor=rgba(0,255,255,1)&fillColor=rgba(0,255,255,0.2)&textColor=rgba(0,255,255,1)"
+    ]
+  }
+]

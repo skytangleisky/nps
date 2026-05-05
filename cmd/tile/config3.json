@@ -1,9 +1,0 @@
-{
-  "addr": ":3143",
-  "rootDir": "~/maps/地形",
-  "contentType":"image/jpeg",
-  "suffix": ".jpg",
-  "tileUrls": [
-    "https://maps-for-free.com/layer/relief/z{z}/row{y}/{z}_{x}-{y}.jpg"
-  ]
-}
