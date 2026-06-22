@@ -7,6 +7,7 @@ import (
 	"github.com/astaxie/beego/logs"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
+	"golang.org/x/sync/singleflight"
 	"io"
 	"log"
 	"math/rand"
@@ -60,11 +61,18 @@ func buildClient(proxy *string) *http.Client {
 	uProxy, err := url.Parse(*proxy)
 	if err != nil {
 		log.Println("proxy parse error:", err)
-		return &http.Client{}
+		return &http.Client{
+			Timeout: 30 * time.Second,
+		}
 	}
 	return &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			Proxy: http.ProxyURL(uProxy),
+			Proxy:               http.ProxyURL(uProxy),
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 20,
+			IdleConnTimeout:     90 * time.Second,
+			ForceAttemptHTTP2:   true,
 		},
 	}
 }
@@ -80,70 +88,74 @@ func expandPath(p string) string {
 	return path
 }
 
-var process = func(w http.ResponseWriter, r *http.Request, rootDir string, tileUrl string, suffix string, proxy *string) {
+var process = func(w http.ResponseWriter, r *http.Request, rootDir string, tileUrl string, suffix string, client *http.Client) {
 	ctx := r.Context()
 	atomic.AddInt64(&count, 1)
-	value := atomic.LoadInt64(&count)
+	//value := atomic.LoadInt64(&count)
 	defer func() {
 		atomic.AddInt64(&count, -1)
-		value = atomic.LoadInt64(&count)
-		log.Println(value)
+		//value = atomic.LoadInt64(&count)
+		//log.Println(value)
 	}()
-	var before = time.Now()
+	//var before = time.Now()
 	query := r.URL.Query()
 	z := query.Get("z")
 	y := query.Get("y")
 	x := query.Get("x")
 	var file = rootDir + "/" + z + "/" + y + "/" + x + suffix
-	log.Print(value)
-	var size int64 = 0
-	info, err := os.Stat(file)
-	if err != nil {
-		client := buildClient(proxy)
-		var tmpUrl = tileUrl
-		tmpUrl = strings.Replace(tmpUrl, "{x}", x, -1)
-		tmpUrl = strings.Replace(tmpUrl, "{y}", y, -1)
-		tmpUrl = strings.Replace(tmpUrl, "{z}", z, -1)
+	//log.Print(value)
+	f, err, _ := sf.Do(file, func() (interface{}, error) {
+		if _, err := os.Stat(file); err == nil {
+			return nil, nil
+		}
+		tmpUrl := strings.ReplaceAll(tileUrl, "{x}", x)
+		tmpUrl = strings.ReplaceAll(tmpUrl, "{y}", y)
+		tmpUrl = strings.ReplaceAll(tmpUrl, "{z}", z)
+
 		req, err := http.NewRequestWithContext(ctx, "GET", tmpUrl, nil)
 		if err != nil {
-			logs.Error(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			return nil, err
 		}
-		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+
 		resp, err := client.Do(req)
 		if err != nil {
-			logs.Error(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			return nil, err
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode == 200 {
-			imgBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				logs.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			_, err = os.Stat(rootDir + "/" + z + "/" + y)
-			if err != nil {
-				os.MkdirAll(rootDir+"/"+z+"/"+y, os.ModePerm)
-			}
-			err = os.WriteFile(file, imgBytes, 0644)
-			if err != nil {
-				logs.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			size = int64(len(imgBytes))
-			var after = time.Now()
-			log.Println(fmt.Sprintf("%s", formatDuration(after.Sub(before))), fmt.Sprintf("%.2fKB", float64(size)/1024), file)
-			http.ServeFile(w, r, file)
-		} else {
+
+		if resp.StatusCode != 200 {
 			w.WriteHeader(resp.StatusCode)
+			w.Write([]byte(fmt.Sprintf("bad status: %d", resp.StatusCode)))
+			return nil, nil
 		}
+
+		os.MkdirAll(filepath.Dir(file), 0755)
+
+		tmp := file + ".tmp"
+		f, err := os.Create(tmp)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = io.Copy(f, resp.Body)
+		f.Close()
+		if err != nil {
+			os.Remove(tmp)
+			return f, err
+		}
+
+		return nil, os.Rename(tmp, file)
+	})
+	if err != nil {
+		logs.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if f != nil {
+		var file = f.(*os.File)
+		file.Seek(0, 0)
+		io.Copy(w, file)
 	} else {
-		size = info.Size()
 		http.ServeFile(w, r, file)
 	}
 }
@@ -182,7 +194,11 @@ func ResolvePath(p string) string {
 	// 可选：其他相对路径也按 exeDir 处理
 	return filepath.Join(base, p)
 }
+
+var sf singleflight.Group
+
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	configPath := flag.String("config", "./config.json", "配置文件路径")
 	flag.Parse()
 	log.SetFlags(log.Llongfile | log.Lmicroseconds | log.Ldate)
@@ -197,6 +213,7 @@ func main() {
 			go func() {
 				rootDir := expandPath(cfg.RootDir)
 				log.SetFlags(log.Llongfile | log.Lmicroseconds | log.Ldate)
+				client := buildClient(cfg.Proxy)
 				var handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Access-Control-Allow-Origin", "*")
 					w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -210,9 +227,8 @@ func main() {
 						http.Error(w, "no tile url configured", 500)
 						return
 					}
-					rd := rand.New(rand.NewSource(time.Now().UnixNano()))
-					w.Header().Set("Content-Type", "image/jpeg")
-					process(w, r, rootDir, cfg.TileUrls[rd.Intn(len(cfg.TileUrls))], cfg.Suffix, cfg.Proxy)
+					w.Header().Set("Content-Type", cfg.ContentType)
+					process(w, r, rootDir, cfg.TileUrls[rand.Intn(len(cfg.TileUrls))], cfg.Suffix, client)
 				})
 				log.Println("rootDir:", rootDir, "Server running at", cfg.Addr)
 				err = http.ListenAndServe(cfg.Addr, h2c.NewHandler(handler, &http2.Server{}))

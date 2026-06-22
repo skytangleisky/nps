@@ -30,6 +30,7 @@ require (
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/tjfoc/gmsm v1.4.0 // indirect
 	github.com/xtaci/smux v1.5.34 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/tools v0.21.0 // indirect
 )
 
